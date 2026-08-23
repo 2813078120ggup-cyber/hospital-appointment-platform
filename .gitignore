@@ -1,0 +1,43 @@
+# IDE and operating-system metadata
+.DS_Store
+Thumbs.db
+**/.idea/
+**/.vscode/
+**/*.iml
+**/*.iws
+**/*.ipr
+**/.classpath
+**/.project
+**/.settings/
+
+# Java / Maven
+**/target/
+**/*.class
+**/*.jar
+**/*.war
+*.log
+logs/
+
+# Node / Vue / Nuxt
+**/node_modules/
+**/.nuxt/
+**/dist/
+**/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local configuration and secrets
+.env
+.env.local
+.env.*.local
+**/application-local.properties
+**/application-local.yml
+**/application-local.yaml
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Local repository-migration backup markers
+.local-backups/
