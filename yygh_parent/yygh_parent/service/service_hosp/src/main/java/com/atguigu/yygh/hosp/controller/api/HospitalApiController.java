@@ -3,12 +3,14 @@ package com.atguigu.yygh.hosp.controller.api;
 import com.atguigu.yygh.common.result.R;
 import com.atguigu.yygh.hosp.service.DepartmentService;
 import com.atguigu.yygh.hosp.service.HospitalService;
+import com.atguigu.yygh.hosp.service.HospitalSetService;
 import com.atguigu.yygh.hosp.service.ScheduleService;
 import com.atguigu.yygh.model.hosp.Hospital;
 import com.atguigu.yygh.model.hosp.Schedule;
 import com.atguigu.yygh.vo.hosp.DepartmentVo;
 import com.atguigu.yygh.vo.hosp.HospitalQueryVo;
 import com.atguigu.yygh.vo.hosp.ScheduleOrderVo;
+import com.atguigu.yygh.vo.order.SignInfoVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +36,9 @@ public class HospitalApiController {
 
     @Autowired
     private ScheduleService scheduleService;
+
+    @Autowired
+    private HospitalSetService hospitalSetService;
 
     @Operation(description = "获取排班详情")
     @GetMapping("getSchedule/{id}")
@@ -109,5 +114,10 @@ public class HospitalApiController {
     @GetMapping("inner/getScheduleOrderVo/{scheduleId}")
     public ScheduleOrderVo getScheduleOrderVo(@PathVariable("scheduleId") String scheduleId) {
         return scheduleService.getScheduleOrderVo(scheduleId);
+    }
+
+    @GetMapping("inner/getSignInfo/{hoscode}")
+    public SignInfoVo getSignInfo(@PathVariable("hoscode") String hoscode) {
+        return hospitalSetService.getSignInfo(hoscode);
     }
 }

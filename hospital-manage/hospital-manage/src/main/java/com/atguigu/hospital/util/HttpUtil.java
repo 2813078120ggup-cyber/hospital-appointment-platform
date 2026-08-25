@@ -52,6 +52,7 @@ public final class HttpUtil {
 			httpcon.setConnectTimeout(CONN_TIMEOUT);
 			httpcon.setReadTimeout(READ_TIMEOUT);
 			httpcon.setRequestMethod(reqmethod);
+			httpcon.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
 			httpcon.connect();
 			if (reqmethod.equalsIgnoreCase(POST)) {
 				OutputStream os = httpcon.getOutputStream();
@@ -67,7 +68,7 @@ public final class HttpUtil {
 			}  
 			in.close();  
 			httpcon.disconnect();
-			return bankXmlBuffer.toString().getBytes();
+			return bankXmlBuffer.toString().getBytes("utf-8");
 		} catch (Exception ex) {
 			log.error(ex.toString(), ex);
 			return null;

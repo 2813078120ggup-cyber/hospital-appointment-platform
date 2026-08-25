@@ -34,14 +34,16 @@ public class OrderInfoController {
     OrderInfoService orderInfoService;
 
     @PostMapping("auth/submitOrder/{scheduleId}/{patientId}")
-    public R submitOrder(@PathVariable("scheduleId") String scheduleId, @PathVariable("patientId") Long patientId) {
-        Long orderId = orderInfoService.createOrder(scheduleId, patientId);
+    public R submitOrder(@PathVariable("scheduleId") String scheduleId,
+                         @PathVariable("patientId") Long patientId,
+                         HttpServletRequest request) {
+        Long orderId = orderInfoService.createOrder(scheduleId, patientId, requireUserId(request));
         return R.ok().data("orderId", orderId);
     }
 
     @GetMapping("auth/getOrders/{orderId}")
-    public R getOrders(@PathVariable("orderId") Long orderId) {
-        OrderInfo orderInfo = orderInfoService.getOrderInfo(orderId);
+    public R getOrders(@PathVariable("orderId") Long orderId, HttpServletRequest request) {
+        OrderInfo orderInfo = orderInfoService.getOrderInfo(orderId, requireUserId(request));
         return R.ok().data("orderInfo", orderInfo);
     }
 
@@ -53,10 +55,7 @@ public class OrderInfoController {
     public R list(@PathVariable("page") Long page,
                   @PathVariable("limit") Long limit,
                   HttpServletRequest request) {
-        Long userId = AuthContextHolder.getUserId(request);
-        if (userId == null) {
-            throw new YyghException(20001, "请先登录");
-        }
+        Long userId = requireUserId(request);
 
         long current = page == null || page < 1 ? 1 : page;
         long size = limit == null || limit < 1 ? 10 : Math.min(limit, 100);
@@ -66,9 +65,17 @@ public class OrderInfoController {
     }
 
     @GetMapping("auth/cancelOrder/{orderId}")
-    public R cancelOrder(@PathVariable("orderId") Long orderId) {
-        boolean flag = orderInfoService.cancelOrder(orderId);
+    public R cancelOrder(@PathVariable("orderId") Long orderId, HttpServletRequest request) {
+        boolean flag = orderInfoService.cancelOrder(orderId, requireUserId(request));
         return R.ok().data("flag", flag);
+    }
+
+    private Long requireUserId(HttpServletRequest request) {
+        Long userId = AuthContextHolder.getUserId(request);
+        if (userId == null) {
+            throw new YyghException(20001, "请先登录");
+        }
+        return userId;
     }
 
     @PostMapping("inner/getCountMap")

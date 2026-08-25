@@ -1,19 +1,20 @@
 package com.atguigu.yygh.orders.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
+import com.atguigu.yygh.common.exception.YyghException;
 import com.atguigu.yygh.enums.OrderStatusEnum;
 import com.atguigu.yygh.enums.PaymentStatusEnum;
 import com.atguigu.yygh.model.order.OrderInfo;
 import com.atguigu.yygh.model.order.PaymentInfo;
 import com.atguigu.yygh.orders.mapper.OrderInfoMapper;
 import com.atguigu.yygh.orders.mapper.PaymentInfoMapper;
-import com.atguigu.yygh.orders.service.OrderInfoService;
 import com.atguigu.yygh.orders.service.PaymentInfoService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.joda.time.DateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.Map;
@@ -59,12 +60,16 @@ public class PaymentInfoServiceImpl extends ServiceImpl<PaymentInfoMapper, Payme
 
     //根据订单交易号，更新订单状态和支付记录状态 ：已经支付
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void paySuccess(String out_trade_no, Map<String, String> resultMap) {
         //1 根据交易号更新订单表订单状态：已经支付
         //根据交易号查询订单信息，
         LambdaQueryWrapper<OrderInfo> wrapperOrderInfo = new LambdaQueryWrapper<>();
         wrapperOrderInfo.eq(OrderInfo::getOutTradeNo,out_trade_no);
         OrderInfo orderInfo = orderInfoMapper.selectOne(wrapperOrderInfo);
+        if (orderInfo == null) {
+            throw new YyghException(20001, "支付对应的订单不存在");
+        }
         //设置修改数据，
         orderInfo.setOrderStatus(OrderStatusEnum.PAID.getStatus());
         //调用方法更新
@@ -74,13 +79,16 @@ public class PaymentInfoServiceImpl extends ServiceImpl<PaymentInfoMapper, Payme
         LambdaQueryWrapper<PaymentInfo> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PaymentInfo::getOutTradeNo,out_trade_no);
         PaymentInfo paymentInfo = baseMapper.selectOne(wrapper);
+        if (paymentInfo == null) {
+            throw new YyghException(20001, "支付记录不存在");
+        }
 
         //设置修改值
         paymentInfo.setPaymentStatus(PaymentStatusEnum.PAID.getStatus()); //支付状态
         //TradeNo 交易编码，在微信退款时候会使用到
         paymentInfo.setTradeNo(resultMap.get("transaction_id"));
         paymentInfo.setCallbackTime(new Date());
-        paymentInfo.setCallbackContent(resultMap.toString());
+        paymentInfo.setCallbackContent(JSONObject.toJSONString(resultMap));
 
         //调用方法更新
         baseMapper.updateById(paymentInfo);
@@ -93,5 +101,12 @@ public class PaymentInfoServiceImpl extends ServiceImpl<PaymentInfoMapper, Payme
         wrapper.eq(PaymentInfo::getOrderId,orderId);
         PaymentInfo paymentInfo = baseMapper.selectOne(wrapper);
         return paymentInfo;
+    }
+
+    @Override
+    public PaymentInfo getPaymentInfoByOutTradeNo(String outTradeNo) {
+        LambdaQueryWrapper<PaymentInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PaymentInfo::getOutTradeNo, outTradeNo);
+        return baseMapper.selectOne(wrapper);
     }
 }

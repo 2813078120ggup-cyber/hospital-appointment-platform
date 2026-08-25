@@ -17,9 +17,8 @@ service.interceptors.request.use(
 
     if (store.getters.token) {
       // let each request carry token
-      // ['X-Token'] is a custom headers key
-      // please modify it according to the actual situation
-      config.headers['X-Token'] = getToken()
+      // 功能完善：与患者门户和后端认证上下文统一使用 token 请求头。
+      config.headers['token'] = getToken()
     }
     return config
   },

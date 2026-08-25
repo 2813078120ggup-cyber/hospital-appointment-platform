@@ -56,13 +56,13 @@ public class ScheduleServiceImpl implements ScheduleService {
         Schedule schedule = this.getScheduleId(scheduleId);
         // if排班对象为null抛出自定义异常
         if(schedule == null){
-            throw new YyghException();
+            throw new YyghException(20001, "排班不存在");
         }
 
         //根据医院编号获取医院信息
         Hospital hospital = hospitalService.getHosp(schedule.getHoscode()); //MongoDB
         if(hospital == null){
-            throw new YyghException();
+            throw new YyghException(20001, "排班所属医院不存在");
         }
 
         //获取挂号规则
@@ -73,6 +73,9 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         orderVo.setDepcode(schedule.getDepcode());
         Department department = departmentService.getDepartment(hospital.getHoscode(), schedule.getDepcode()); //MongoDB
+        if (department == null) {
+            throw new YyghException(20001, "排班所属科室不存在");
+        }
         orderVo.setDepname(department.getDepname());
 
         orderVo.setHosScheduleId(schedule.getHosScheduleId()); //排班编号
@@ -103,6 +106,78 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Override
     public void update(Schedule schedule) {
         scheduleRepository.save(schedule);  // 由_id决定(save方法内部逻辑): 如果_id存在则更新，不存在则插入
+    }
+
+    @Override
+    public boolean hasAvailableSchedule(String departmentName,
+                                        String date,
+                                        String time,
+                                        String doctorName) {
+        if (departmentName == null || departmentName.trim().isEmpty()) {
+            throw new IllegalArgumentException("科室名称不能为空");
+        }
+
+        Date workDate = parseWorkDate(date);
+        Integer workTime = parseWorkTime(time);
+        String normalizedDoctorName = doctorName == null ? null : doctorName.trim();
+        List<Department> departments = departmentService.findByDepname(departmentName.trim());
+
+        if (departments == null || departments.isEmpty()) {
+            return false;
+        }
+
+        for (Department department : departments) {
+            boolean available;
+            if (normalizedDoctorName == null || normalizedDoctorName.isEmpty()) {
+                available = scheduleRepository
+                        .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThan(
+                                department.getHoscode(),
+                                department.getDepcode(),
+                                workDate,
+                                workTime,
+                                1,
+                                0);
+            } else {
+                available = scheduleRepository
+                        .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThan(
+                                department.getHoscode(),
+                                department.getDepcode(),
+                                workDate,
+                                workTime,
+                                normalizedDoctorName,
+                                1,
+                                0);
+            }
+            if (available) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Date parseWorkDate(String date) {
+        if (date == null || date.trim().isEmpty()) {
+            throw new IllegalArgumentException("日期不能为空");
+        }
+        try {
+            return DateTimeFormat.forPattern("yyyy-MM-dd")
+                    .parseDateTime(date.trim())
+                    .withTimeAtStartOfDay()
+                    .toDate();
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("日期格式应为yyyy-MM-dd", exception);
+        }
+    }
+
+    private Integer parseWorkTime(String time) {
+        if (time == null || time.trim().isEmpty()) {
+            throw new IllegalArgumentException("时间不能为空");
+        }
+        return switch (time.trim()) {
+            case "上午", "0" -> 0;
+            case "下午", "1" -> 1;
+            default -> throw new IllegalArgumentException("时间仅支持上午或下午");
+        };
     }
 
 
@@ -145,7 +220,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         schedule.setDepcode(depcode);
         Example<Schedule> example = Example.of(schedule);
 
-        Page<Schedule> all = scheduleRepository.findAll(pageable);
+        // 功能完善：分页查询必须应用医院和科室条件，避免跨医院返回排班。
+        Page<Schedule> all = scheduleRepository.findAll(example, pageable);
         return all;
     }
 
@@ -370,8 +446,9 @@ public class ScheduleServiceImpl implements ScheduleService {
     //获取排班详情
     @Override
     public Schedule getScheduleId(String id) {
-        Schedule schedule = this.packageSchedule(scheduleRepository.findById(id).get());
-        return schedule;
+        return scheduleRepository.findById(id)
+                .map(this::packageSchedule)
+                .orElse(null);
     }
 
 

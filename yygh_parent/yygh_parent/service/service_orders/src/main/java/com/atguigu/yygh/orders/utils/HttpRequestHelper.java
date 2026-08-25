@@ -3,6 +3,9 @@ package com.atguigu.yygh.orders.utils;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,27 +54,19 @@ public class HttpRequestHelper {
      * @return
      */
     public static String getSign(Map<String, Object> paramMap, String signKey) {
-        if(paramMap.containsKey("sign")) {
-            paramMap.remove("sign");
-        }
         TreeMap<String, Object> sorted = new TreeMap<>(paramMap);
+        sorted.remove("sign");
         StringBuilder str = new StringBuilder();
         for (Map.Entry<String, Object> param : sorted.entrySet()) {
             str.append(param.getValue()).append("|");
         }
         str.append(signKey);
-        log.info("加密前：" + str.toString());
-        String md5Str = MD5.encrypt(str.toString());
-        log.info("加密后：" + md5Str);
-        return md5Str;
+        return MD5.encrypt(str.toString());
     }
 
     public static String getSignSingle(String signKey) {
 
-        log.info("加密前：" + signKey);
-        String md5Str = MD5.encrypt(signKey);
-        log.info("加密后：" + md5Str);
-        return md5Str;
+        return MD5.encrypt(signKey);
     }
 
     /**
@@ -80,7 +75,23 @@ public class HttpRequestHelper {
      * @return
      */
     public static boolean isSignEquals(Map<String, Object> paramMap, String signKey) {
-        return true;
+        Object sign = paramMap.get("sign");
+        Object timestamp = paramMap.get("timestamp");
+        if (sign == null || signKey == null || signKey.isBlank() || !isTimestampFresh(timestamp)) {
+            return false;
+        }
+        String expected = getSignSingle(signKey);
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                sign.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static boolean isTimestampFresh(Object timestamp) {
+        try {
+            long requestTime = Long.parseLong(String.valueOf(timestamp));
+            return Math.abs(System.currentTimeMillis() - requestTime) <= 5 * 60 * 1000L;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
     }
 
     /**
@@ -98,22 +109,26 @@ public class HttpRequestHelper {
      * @return
      */
     public static JSONObject sendRequest(Map<String, Object> paramMap, String url){
-        String result = "";
         try {
             //封装post参数
             StringBuilder postdata = new StringBuilder();
             for (Map.Entry<String, Object> param : paramMap.entrySet()) {
-                postdata.append(param.getKey()).append("=")
-                        .append(param.getValue()).append("&");
+                if (postdata.length() > 0) {
+                    postdata.append("&");
+                }
+                postdata.append(URLEncoder.encode(param.getKey(), StandardCharsets.UTF_8))
+                        .append("=")
+                        .append(URLEncoder.encode(String.valueOf(param.getValue()), StandardCharsets.UTF_8));
             }
-            log.info(String.format("--> 发送请求：post data %1s", postdata));
-            byte[] reqData = postdata.toString().getBytes("utf-8");
+            byte[] reqData = postdata.toString().getBytes(StandardCharsets.UTF_8);
             byte[] respdata = HttpUtil.doPost(url,reqData);
-            result = new String(respdata);
-            log.info(String.format("--> 应答结果：result data %1s", result));
+            if (respdata == null) {
+                return null;
+            }
+            return JSONObject.parseObject(new String(respdata, StandardCharsets.UTF_8));
         } catch (Exception ex) {
-            ex.printStackTrace();
+            log.error("远程调用失败，url={}", url, ex);
+            return null;
         }
-        return JSONObject.parseObject(result);
     }
 }

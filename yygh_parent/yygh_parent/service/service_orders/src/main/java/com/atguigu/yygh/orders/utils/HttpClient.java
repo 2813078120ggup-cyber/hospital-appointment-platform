@@ -7,8 +7,7 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.*;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLContextBuilder;
-import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -21,8 +20,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.KeyStore;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -143,42 +140,28 @@ public class HttpClient {
     }
     private void execute(HttpUriRequest http) throws ClientProtocolException,
             IOException {
-        CloseableHttpClient httpClient = null;
         try {
-            if (isHttps) {
-                if(isCert) {
-                    //TODO 需要完善
-                    FileInputStream inputStream = new FileInputStream(new File(ConstantPropertiesUtils.CERT));
+            CloseableHttpClient httpClient;
+            if (isHttps && isCert) {
+                // 功能完善：退款接口加载商户证书，并使用受支持的 TLS 和主机名校验。
+                try (FileInputStream inputStream = new FileInputStream(new File(ConstantPropertiesUtils.CERT))) {
                     KeyStore keystore = KeyStore.getInstance("PKCS12");
                     char[] partnerId2charArray = certPassword.toCharArray();
                     keystore.load(inputStream, partnerId2charArray);
                     SSLContext sslContext = SSLContexts.custom().loadKeyMaterial(keystore, partnerId2charArray).build();
                     SSLConnectionSocketFactory sslsf =
                             new SSLConnectionSocketFactory(sslContext,
-                                    new String[] { "TLSv1" },
+                                    new String[] { "TLSv1.2" },
                                     null,
-                                    SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);
+                                    new DefaultHostnameVerifier());
                     httpClient = HttpClients.custom().setSSLSocketFactory(sslsf).build();
-                } else {
-                    SSLContext sslContext = new SSLContextBuilder()
-                            .loadTrustMaterial(null, new TrustStrategy() {
-                                // 信任所有
-                                public boolean isTrusted(X509Certificate[] chain,
-                                                         String authType)
-                                        throws CertificateException {
-                                    return true;
-                                }
-                            }).build();
-                    SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
-                            sslContext);
-                    httpClient = HttpClients.custom().setSSLSocketFactory(sslsf)
-                            .build();
                 }
             } else {
+                // 功能完善：普通 HTTPS 使用系统信任库，禁止“信任所有证书”。
                 httpClient = HttpClients.createDefault();
             }
-            CloseableHttpResponse response = httpClient.execute(http);
-            try {
+            try (CloseableHttpClient client = httpClient;
+                 CloseableHttpResponse response = client.execute(http)) {
                 if (response != null) {
                     if (response.getStatusLine() != null)
                         statusCode = response.getStatusLine().getStatusCode();
@@ -186,13 +169,12 @@ public class HttpClient {
                     // 响应内容
                     content = EntityUtils.toString(entity, Consts.UTF_8);
                 }
-            } finally {
-                response.close();
             }
         } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            httpClient.close();
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            }
+            throw new IOException("HTTP request failed", e);
         }
     }
     public int getStatusCode() {

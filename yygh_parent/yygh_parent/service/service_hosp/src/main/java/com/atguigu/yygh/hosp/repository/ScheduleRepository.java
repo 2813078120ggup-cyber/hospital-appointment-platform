@@ -16,5 +16,21 @@ public interface ScheduleRepository extends MongoRepository<Schedule, String> {
     //根据医院编号 + 科室编号 + 工作日期，查询科室里面医生排班详细信息
     List<Schedule> getScheduleByHoscodeAndDepcodeAndWorkDate(String hoscode, String depcode, Date date);
 
+    boolean existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThan(
+            String hoscode,
+            String depcode,
+            Date workDate,
+            Integer workTime,
+            Integer status,
+            Integer availableNumber);
+
+    boolean existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThan(
+            String hoscode,
+            String depcode,
+            Date workDate,
+            Integer workTime,
+            String docname,
+            Integer status,
+            Integer availableNumber);
 
 }

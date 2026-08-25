@@ -13,8 +13,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseBody
     public R error(Exception e) {
-        System.out.println("全局.......");
-        e.printStackTrace();
+        log.error("Unhandled application exception", e);
         return R.error().message("执行全局异常处理");
     }
 
@@ -22,8 +21,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ArithmeticException.class)
     @ResponseBody
     public R error(ArithmeticException e) {
-        System.out.println("特定.......");
-        e.printStackTrace();
+        log.error("Arithmetic exception", e);
         return R.error().message("执行特定异常处理");
     }
 
@@ -31,8 +29,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(YyghException.class)
     @ResponseBody
     public R error(YyghException e) {
-        log.error("execute yygh exception");
-        e.printStackTrace();
+        // 功能完善：业务异常只记录状态和消息，避免把完整堆栈及敏感请求信息输出到控制台。
+        log.warn("Business exception, code={}, message={}", e.getCode(), e.getMsg());
         return R.error().code(e.getCode()).message(e.getMsg());
     }
 }

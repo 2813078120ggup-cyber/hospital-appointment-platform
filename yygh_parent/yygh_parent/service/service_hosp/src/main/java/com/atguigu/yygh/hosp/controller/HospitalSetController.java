@@ -10,13 +10,15 @@ import com.atguigu.yygh.vo.hosp.HospitalSetQueryVo;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.UUID;
 
 /**
  * 医院设置表 前端控制器
@@ -30,6 +32,12 @@ public class HospitalSetController {
     //注入service
     @Autowired
     private HospitalSetService hospitalSetService;
+
+    @Value("${yygh.hospital-manage.base-url:http://localhost:9998}")
+    private String hospitalManageBaseUrl;
+
+    @Value("${yygh.hospital-manage.bootstrap-token:}")
+    private String bootstrapToken;
 
     //9 医院设置锁定和解锁
     @PutMapping("lockHospitalSet/{id}/{status}")
@@ -62,6 +70,12 @@ public class HospitalSetController {
     //@ApiOperation("修改")
     @PutMapping("updateHospSet")
     public R updateHospset(@RequestBody HospitalSet hospitalSet) {
+        HospitalSet existing = hospitalSetService.getById(hospitalSet.getId());
+        if (existing == null) {
+            return R.error().message("医院设置不存在");
+        }
+        // 功能完善：普通编辑接口禁止从客户端覆盖已生成的签名密钥。
+        hospitalSet.setSignKey(existing.getSignKey());
         boolean is_success = hospitalSetService.updateById(hospitalSet);
         if (is_success) {
             return R.ok();
@@ -72,7 +86,7 @@ public class HospitalSetController {
 
     @PostMapping("addHospSet")
     public R addHospSet(@RequestBody HospitalSet hospitalSet) {
-        hospitalSet.setSignKey("1");
+        hospitalSet.setSignKey(generateSignKey());
         boolean is_success = hospitalSetService.save(hospitalSet);
         if (is_success) {
             return R.ok();
@@ -92,9 +106,13 @@ public class HospitalSetController {
     //5 添加接口 restful
     //@ApiOperation("添加")
     @PostMapping("saveHospSet")
+    @Transactional(rollbackFor = Exception.class)
     public R saveHospset(@RequestBody HospitalSet hospitalSet) {
-        //为每个医院生成唯一字符串
-        String signKey = System.currentTimeMillis() + "" + new Random().nextInt(1000);
+        if (!StringUtils.hasText(bootstrapToken)) {
+            throw new YyghException(20001, "医院签名同步令牌未配置");
+        }
+        // 功能完善：使用不可预测的随机值生成医院签名密钥。
+        String signKey = generateSignKey();
         //设置到hospitalSet
         hospitalSet.setSignKey(signKey);
         //添加方法调用
@@ -105,12 +123,24 @@ public class HospitalSetController {
             Map<String, Object> map = new HashMap<>();
             map.put("sign", signKey); //签名秘钥
             map.put("hoscode", hospitalSet.getHoscode()); //医院编号
+            map.put("timestamp", HttpRequestHelper.getTimestamp());
+            map.put("bootstrapToken", bootstrapToken);
             //使用httpclient调用，封装了工具类
-            HttpRequestHelper.sendRequest(map, "http://localhost:9998/hospSet/updateSignKey");
+            String targetBaseUrl = StringUtils.hasText(hospitalSet.getApiUrl())
+                    ? hospitalSet.getApiUrl() : hospitalManageBaseUrl;
+            com.alibaba.fastjson.JSONObject response = HttpRequestHelper.sendRequest(map,
+                    targetBaseUrl.replaceAll("/+$", "") + "/hospSet/updateSignKey");
+            if (response == null || response.getIntValue("code") != 200) {
+                throw new YyghException(20001, "医院签名密钥同步失败");
+            }
             return R.ok();
         } else {
             return R.error();
         }
+    }
+
+    private String generateSignKey() {
+        return UUID.randomUUID().toString().replace("-", "");
     }
 
     //4 条件分页查询

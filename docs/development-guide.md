@@ -35,9 +35,11 @@ Get-Content database\schema\yygh_user.sql -Raw | mysql -u root -p
 ```powershell
 $env:YYGH_DB_PASSWORD = '<本地 MySQL 密码>'
 $env:YYGH_JWT_SECRET = '<至少 32 个 UTF-8 字节的随机字符串>'
+$env:YYGH_ADMIN_PASSWORD = '<管理端密码>'
+$env:YYGH_HOSPITAL_BOOTSTRAP_TOKEN = '<平台与医院模拟端共享的随机引导令牌>'
 ```
 
-如果基础设施不在默认 `192.168.6.101`，继续按 [配置说明](configuration.md) 覆盖 Nacos、Redis、MongoDB、RabbitMQ 和各数据库 URL。第三方能力不用时可保持相应凭据为空，但调用该能力会失败。
+基础设施默认连接 `localhost`。如果服务运行在其他主机，继续按 [配置说明](configuration.md) 覆盖 Nacos、Redis、MongoDB、RabbitMQ 和各数据库 URL。第三方能力不用时可保持相应凭据为空，但调用该能力会明确失败。
 
 ## 4. 构建后端
 

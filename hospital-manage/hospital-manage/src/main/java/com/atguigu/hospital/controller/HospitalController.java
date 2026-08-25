@@ -4,6 +4,7 @@ import com.atguigu.hospital.service.ApiService;
 import com.atguigu.hospital.service.HospitalService;
 import com.atguigu.hospital.util.HttpRequestHelper;
 import com.atguigu.hospital.util.Result;
+import com.atguigu.hospital.util.ResultCodeEnum;
 import com.atguigu.hospital.util.YyghException;
 import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,9 +35,10 @@ public class HospitalController {
         try {
             Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());
 
-//			if(!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
-//				throw new YyghException(ResultCodeEnum.SIGN_ERROR);
-//			}
+            // 功能完善：医院侧订单接口统一校验签名和时间戳，拒绝伪造及过期请求。
+            if (!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
+                throw new YyghException(ResultCodeEnum.SIGN_ERROR);
+            }
 
             Map<String, Object> resultMap = hospitalService.submitOrder(paramMap);
             return Result.ok(resultMap);
@@ -52,9 +54,9 @@ public class HospitalController {
     public Result updatePayStatus(HttpServletRequest request, HttpServletResponse response) {
         try {
             Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());
-//			if(!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
-//				throw new YyghException(ResultCodeEnum.SIGN_ERROR);
-//			}
+            if (!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
+                throw new YyghException(ResultCodeEnum.SIGN_ERROR);
+            }
 
             hospitalService.updatePayStatus(paramMap);
             return Result.ok();
@@ -70,9 +72,9 @@ public class HospitalController {
     public Result updateCancelStatus(HttpServletRequest request, HttpServletResponse response) {
         try {
             Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());
-//			if(!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
-//				throw new YyghException(ResultCodeEnum.SIGN_ERROR);
-//			}
+            if (!HttpRequestHelper.isSignEquals(paramMap, apiService.getSignKey())) {
+                throw new YyghException(ResultCodeEnum.SIGN_ERROR);
+            }
 
             hospitalService.updateCancelStatus(paramMap);
             return Result.ok();
@@ -81,4 +83,3 @@ public class HospitalController {
         }
     }
 }
-

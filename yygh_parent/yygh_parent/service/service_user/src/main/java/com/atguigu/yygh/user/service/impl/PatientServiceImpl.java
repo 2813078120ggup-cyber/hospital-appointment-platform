@@ -46,6 +46,10 @@ public class PatientServiceImpl extends ServiceImpl<PatientMapper, Patient> impl
     //根据编号获取名称，使用远程调用实现
     private Patient packPatient(Patient patient) {
 
+        if (patient == null) {
+            return null;
+        }
+
         //根据证件类型编码，获取证件类型具体指
         String certificatesTypeString =
                 dictFeignClient.getName(DictEnum.CERTIFICATES_TYPE.getDictCode(), patient.getCertificatesType());//联系人证件

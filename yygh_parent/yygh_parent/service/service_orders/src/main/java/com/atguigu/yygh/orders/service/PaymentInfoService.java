@@ -24,4 +24,6 @@ public interface PaymentInfoService extends IService<PaymentInfo> {
 
     //1 根据orderId查询支付记录表，获取支付记录
     PaymentInfo getPaymentInfoByOrderId(Long orderId);
+
+    PaymentInfo getPaymentInfoByOutTradeNo(String outTradeNo);
 }

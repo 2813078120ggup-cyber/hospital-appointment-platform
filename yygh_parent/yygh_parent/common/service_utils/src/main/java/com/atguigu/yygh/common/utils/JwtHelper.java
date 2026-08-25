@@ -51,8 +51,8 @@ public class JwtHelper {
         if(StringUtils.isEmpty(token)) return null;
         Jws<Claims> claimsJws = Jwts.parser().setSigningKey(tokenSignKey).parseClaimsJws(token);
         Claims claims = claimsJws.getBody();
-        Integer userId = (Integer)claims.get("userId");
-        return userId.longValue();
+        Object userId = claims.get("userId");
+        return userId instanceof Number ? ((Number) userId).longValue() : null;
     }
 
     //根据token字符串，从token获取UserName

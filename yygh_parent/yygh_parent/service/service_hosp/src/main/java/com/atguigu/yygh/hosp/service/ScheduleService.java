@@ -37,4 +37,7 @@ public interface ScheduleService {
 
     //修改排班信息
     void update(Schedule schedule);
+
+    //根据科室名称、日期、时间和可选医生查询是否有可预约号源
+    boolean hasAvailableSchedule(String departmentName, String date, String time, String doctorName);
 }

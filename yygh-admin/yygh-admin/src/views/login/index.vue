@@ -44,8 +44,7 @@
       <el-button :loading="loading" type="primary" style="width:100%;margin-bottom:30px;" @click.native.prevent="handleLogin">Login</el-button>
 
       <div class="tips">
-        <span style="margin-right:20px;">username: admin</span>
-        <span> password: any</span>
+        <span>请使用部署环境配置的管理员账号登录</span>
       </div>
 
     </el-form>
@@ -75,7 +74,7 @@ export default {
     return {
       loginForm: {
         username: 'admin',
-        password: '111111'
+        password: ''
       },
       loginRules: {
         username: [{ required: true, trigger: 'blur', validator: validateUsername }],
@@ -107,7 +106,7 @@ export default {
     },
     handleLogin() {
       this.$refs.loginForm.validate(valid => {
-        //debugger
+        // debugger
         if (valid) {
           this.loading = true
           this.$store.dispatch('user/login', this.loginForm).then(() => {

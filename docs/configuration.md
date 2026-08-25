@@ -14,13 +14,17 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `YYGH_MANAGE_TEST_DATASOURCE_URL` | 测试环境 | 医院模拟端 test profile JDBC URL，默认 localhost |
 | `YYGH_ORDER_DATASOURCE_URL` | 按环境 | `yygh_order` JDBC URL |
 | `YYGH_USER_DATASOURCE_URL` | 按环境 | `yygh_user` JDBC URL |
-| `YYGH_NACOS_SERVER_ADDR` | 必需 | Nacos 地址，默认 `192.168.6.101:8848` |
-| `YYGH_MONGODB_URI` | 必需 | MongoDB URI，默认 `mongodb://192.168.6.101:27017/test` |
-| `YYGH_REDIS_HOST` / `YYGH_REDIS_PORT` | 必需 | Redis 地址，默认 `192.168.6.101:6379` |
-| `YYGH_RABBITMQ_HOST` / `YYGH_RABBITMQ_PORT` | 必需 | RabbitMQ 地址，默认 `192.168.6.101:5672` |
+| `YYGH_NACOS_SERVER_ADDR` | 必需 | Nacos 地址，默认 `localhost:8848` |
+| `YYGH_MONGODB_URI` | 必需 | MongoDB URI，默认 `mongodb://localhost:27017/test` |
+| `YYGH_REDIS_HOST` / `YYGH_REDIS_PORT` | 必需 | Redis 地址，默认 `localhost:6379` |
+| `YYGH_RABBITMQ_HOST` / `YYGH_RABBITMQ_PORT` | 必需 | RabbitMQ 地址，默认 `localhost:5672` |
 | `YYGH_RABBITMQ_USERNAME` / `YYGH_RABBITMQ_PASSWORD` | 必需 | RabbitMQ 凭据，开发默认 `guest/guest` |
-| `YYGH_SENTINEL_DASHBOARD` | 可选 | Sentinel Dashboard，默认 `192.168.6.101:8058` |
-| `YYGH_JWT_SECRET` | 必需 | JWT HMAC 密钥，至少 32 个 UTF-8 字节；未设置时登录相关调用会失败 |
+| `YYGH_SENTINEL_DASHBOARD` | 可选 | Sentinel Dashboard，默认 `localhost:8058` |
+| `YYGH_JWT_SECRET` | 必需 | JWT HMAC 密钥，至少 32 个 UTF-8 字节；未设置时网关拒绝启动 |
+| `YYGH_ADMIN_USERNAME` / `YYGH_ADMIN_PASSWORD` | 必需 | 管理端账号；用户名默认 `admin`，密码无默认值 |
+| `YYGH_HOSPITAL_BOOTSTRAP_TOKEN` | 必需 | 平台首次向医院模拟端同步签名密钥的独立引导令牌 |
+| `YYGH_HOSPITAL_MANAGE_URL` | 本地联调 | 医院模拟端地址，默认 `http://localhost:9998` |
+| `YYGH_PLATFORM_API_URL` | 本地联调 | 医院模拟端调用平台的地址，默认 `http://localhost:8201` |
 
 ## 第三方能力
 
@@ -34,6 +38,9 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `WECHAT_PAY_APP_ID` | `service-orders` | 微信支付应用 ID |
 | `WECHAT_PAY_PARTNER_ID` / `WECHAT_PAY_PARTNER_KEY` | `service-orders` | 商户号与商户密钥 |
 | `WECHAT_PAY_CERT_PATH` | `service-orders` | 本机证书绝对路径；证书文件不可提交 |
+| `WECHAT_PAY_NOTIFY_URL` | `service-orders` | 微信支付回调地址；部署时必须是微信可访问的 HTTPS 地址 |
+| `ALIYUN_SMS_APPCODE` | `service-msm` | 阿里云市场短信凭据，无默认值 |
+| `ALIYUN_SMS_HOST` / `ALIYUN_SMS_PATH` / `ALIYUN_SMS_TEMPLATE_ID` | `service-msm` | 短信供应商地址、路径和模板 |
 
 ## 前端配置
 

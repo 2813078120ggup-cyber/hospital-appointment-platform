@@ -62,8 +62,8 @@ public class DepartmentServiceImpl implements DepartmentService {
         department.setDepcode(depcode);
         Example<Department> example = Example.of(department);
 
-        //调用方法分页查询
-        Page<Department> pageModel = departmentRepository.findAll(pageable);
+        // 功能完善：分页查询必须应用 hoscode/depcode 条件，避免返回其他医院科室。
+        Page<Department> pageModel = departmentRepository.findAll(example, pageable);
 
         //返回
         return pageModel;
@@ -138,6 +138,11 @@ public class DepartmentServiceImpl implements DepartmentService {
     public Department getDepartment(String hoscode, String depcode) {
         Department dept = departmentRepository.getDeptByHoscodeAndDepcode(hoscode, depcode);
         return dept;
+    }
+
+    @Override
+    public List<Department> findByDepname(String depname) {
+        return departmentRepository.findAllByDepname(depname);
     }
 
 }

@@ -15,10 +15,10 @@ import java.util.Map;
 public interface OrderInfoService extends IService<OrderInfo> {
 
     //下单
-    Long createOrder(String scheduleId, Long patientId);
+    Long createOrder(String scheduleId, Long patientId, Long userId);
 
     //获取订单信息
-    OrderInfo getOrderInfo(Long orderId);
+    OrderInfo getOrderInfo(Long orderId, Long userId);
 
     /**
      * 分页获取当前用户的订单。userId 必须来自当前请求的认证上下文，
@@ -27,7 +27,10 @@ public interface OrderInfoService extends IService<OrderInfo> {
     IPage<OrderInfo> selectPageByUserId(Page<OrderInfo> pageParam, Long userId);
 
     //取消订单
-    boolean cancelOrder(Long orderId);
+    boolean cancelOrder(Long orderId, Long userId);
+
+    // 功能完善：支付成功后把状态同步到医院系统，供轮询和支付回调复用。
+    boolean updatePayStatusToHospital(Long orderId);
 
     //就医提醒
     void patientTips(String dateString);
