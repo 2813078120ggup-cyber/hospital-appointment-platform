@@ -6,6 +6,7 @@ import com.atguigu.yygh.vo.order.OrderCountQueryVo;
 import org.springframework.stereotype.Component;
 import java.util.Map;
 
+// 熔断类：当调用订单服务失败时，执行当前类中的方法
 @Component
 public class OrderInfoDegradeFeignClient implements OrderInfoFeignClient {
 

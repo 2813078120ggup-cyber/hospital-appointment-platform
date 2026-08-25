@@ -44,6 +44,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private DepartmentService departmentService;
 
     //下单辅助方法：根据排班主键查询排班订单信息
+    // 根据排班id查询预约挂号相关数据
     @Override
     public ScheduleOrderVo getScheduleOrderVo(String scheduleId) {
 
@@ -51,7 +52,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         ScheduleOrderVo orderVo = new ScheduleOrderVo();
 
         //根据排班id获取排班信息
+        // 1. 根据排班id查询mongo排班实体对象
         Schedule schedule = this.getScheduleId(scheduleId);
+        // if排班对象为null抛出自定义异常
         if(schedule == null){
             throw new YyghException();
         }
@@ -86,7 +89,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         orderVo.setQuitTime(quitTime.toDate()); //退号时间
 
         DateTime startTime = this.getDateTime(new Date(), bookingRule.getReleaseTime());
-        DateTime endTime = this.getDateTime(new DateTime().plus(bookingRule.getCycle()).toDate(), bookingRule.getStopTime());
+        DateTime endTime = this.getDateTime(new DateTime().plusDays(bookingRule.getCycle()).toDate(), bookingRule.getStopTime());
         orderVo.setStartTime(startTime.toDate());//预约开始时间
         orderVo.setEndTime(endTime.toDate()); //预约结束时间
 
@@ -99,7 +102,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public void update(Schedule schedule) {
-        scheduleRepository.save(schedule);
+        scheduleRepository.save(schedule);  // 由_id决定(save方法内部逻辑): 如果_id存在则更新，不存在则插入
     }
 
 
@@ -472,5 +475,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 break;
         }
         return dayOfWeek;
+        
+      
     }
 }

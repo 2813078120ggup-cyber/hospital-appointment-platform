@@ -14,6 +14,7 @@ public class R {
 
     private String message; //返回消息
 
+    // 前端
     private Map<String,Object> data = new HashMap<String,Object>();
 
     //构造私有化

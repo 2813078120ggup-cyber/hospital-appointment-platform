@@ -22,21 +22,8 @@ public class MsmController {
     //根据手机号发送短信验证码
     @GetMapping(value = "/send/{phone}")
     public R code(@PathVariable String phone) {
-
-//        String code = redisTemplate.opsForValue().get(phone);
-//        if(!StringUtils.isEmpty(code)) return R.ok();
-//        //生成验证码
-//        code = RandomUtil.getFourBitRandom();
-//        //调用service方法发送
-//        boolean is_success = msmService.sendMsm(phone,code);
-//        //如果发送成功，把验证码放到redis，设置有效时长
-//        if(is_success) {
-//            //key：手机号  value：验证码
-//            redisTemplate.opsForValue().set(phone,code,5, TimeUnit.MINUTES);
-//            return R.ok();
-//        } else {
-//            return R.error();
-//        }
+        // 本地演示模式：暂不调用第三方短信，直接返回成功。
+        // 登录服务仍使用固定验证码 6666。
         return R.ok();
 
     }

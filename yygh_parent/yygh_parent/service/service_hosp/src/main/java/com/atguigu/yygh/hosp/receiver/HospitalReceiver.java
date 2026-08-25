@@ -38,7 +38,7 @@ public class HospitalReceiver {
             Schedule schedule = scheduleService.getScheduleId(orderMqVo.getScheduleId());
             schedule.setReservedNumber(orderMqVo.getReservedNumber());
             schedule.setAvailableNumber(orderMqVo.getAvailableNumber());
-            scheduleService.update(schedule); //预约下单
+            scheduleService.update(schedule); //预约下单  更新mongo数据库排班集合数据
         }else{
             Schedule schedule = scheduleService.getScheduleId(orderMqVo.getScheduleId());
             schedule.setAvailableNumber(schedule.getAvailableNumber().intValue()+1);
@@ -46,7 +46,7 @@ public class HospitalReceiver {
         }
         MsmVo msmVo = orderMqVo.getMsmVo();
         if (msmVo != null) {
-            rabbitService.sendMessage(MqConst.EXCHANGE_DIRECT_ORDER, MqConst.ROUTING_MSM_ITEM, msmVo);//通知用户发短信
+            rabbitService.sendMessage(MqConst.EXCHANGE_DIRECT_MSM, MqConst.ROUTING_MSM_ITEM, msmVo);//通知用户发短信
         }
     }
 }

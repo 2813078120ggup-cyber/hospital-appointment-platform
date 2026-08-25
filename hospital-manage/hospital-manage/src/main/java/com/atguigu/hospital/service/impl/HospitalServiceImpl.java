@@ -32,6 +32,7 @@ public class HospitalServiceImpl implements HospitalService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public Map<String, Object> submitOrder(Map<String, Object> paramMap) {
+        // 把 JSON 格式的字符串，解析成 JSONObject 对象。
         log.info(JSONObject.toJSONString(paramMap));
         String hoscode = (String) paramMap.get("hoscode");
         String depcode = (String) paramMap.get("depcode");
@@ -52,14 +53,15 @@ public class HospitalServiceImpl implements HospitalService {
         }
 
         //就诊人信息
+        // 先把 paramMap 转成 JSON 字符串，再把 JSON 字符串转换成 Patient 对象.
         Patient patient = JSONObject.parseObject(JSONObject.toJSONString(paramMap), Patient.class);
         log.info(JSONObject.toJSONString(patient));
         //处理就诊人业务
-        Long patientId = this.savePatient(patient);
+        Long patientId = this.savePatient(patient);  // 医院端保存就诊人id，与微服务端就诊人id不一样
 
         Map<String, Object> resultMap = new HashMap<>();
         int availableNumber = schedule.getAvailableNumber().intValue() - 1;
-        if (availableNumber > 0) {
+        if (availableNumber >= 0) {
             schedule.setAvailableNumber(availableNumber);
             hospitalMapper.updateById(schedule);
 
@@ -68,13 +70,13 @@ public class HospitalServiceImpl implements HospitalService {
             orderInfo.setPatientId(patientId);
             orderInfo.setScheduleId(Long.parseLong("1"));
             int number = schedule.getReservedNumber().intValue() - schedule.getAvailableNumber().intValue();
-            orderInfo.setNumber(number);
+            orderInfo.setNumber(number); // 挂号序号
             orderInfo.setAmount(new BigDecimal(amount));
             String fetchTime = "0".equals(reserveDate) ? " 09:30前" : " 14:00前";
-            orderInfo.setFetchTime(reserveTime + fetchTime);
+            orderInfo.setFetchTime(reserveTime + fetchTime); // 取号日期+时间
             orderInfo.setFetchAddress("一楼9号窗口");
             //默认 未支付
-            orderInfo.setOrderStatus(0);
+            orderInfo.setOrderStatus(0); // 0下单未支付  1已支付  2取号  -1取消（OrderStatusEnum）
             orderInfoMapper.insert(orderInfo);
 
             resultMap.put("resultCode", "0000");

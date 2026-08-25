@@ -1,5 +1,6 @@
 package com.atguigu.yygh.rabbit.constant;
 
+// 统一保存 RabbitMQ 的交换机名、RoutingKey 和队列名的常量配置类。
 public class MqConst {
     //预约下单
     public static final String EXCHANGE_DIRECT_ORDER = "exchange.direct.order";

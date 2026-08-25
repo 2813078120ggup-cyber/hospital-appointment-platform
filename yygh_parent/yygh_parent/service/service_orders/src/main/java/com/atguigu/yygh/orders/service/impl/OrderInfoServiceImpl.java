@@ -20,6 +20,8 @@ import com.atguigu.yygh.vo.order.OrderCountVo;
 import com.atguigu.yygh.vo.order.OrderMqVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.joda.time.DateTime;
 import org.springframework.beans.BeanUtils;
@@ -42,6 +44,7 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
     @Autowired
     private HospitalFeignClient hospitalFeignClient;
+
     @Autowired
     private RabbitService rabbitService;
 
@@ -160,6 +163,18 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         return this.packOrderInfo(orderInfo);
     }
 
+    @Override
+    public IPage<OrderInfo> selectPageByUserId(Page<OrderInfo> pageParam, Long userId) {
+        LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderInfo::getUserId, userId)
+                .orderByDesc(OrderInfo::getCreateTime)
+                .orderByDesc(OrderInfo::getId);
+
+        IPage<OrderInfo> page = baseMapper.selectPage(pageParam, wrapper);
+        page.getRecords().forEach(this::packOrderInfo);
+        return page;
+    }
+
     private OrderInfo packOrderInfo(OrderInfo orderInfo) {
         orderInfo.getParam().put("orderStatusString", OrderStatusEnum.getStatusNameByStatus(orderInfo.getOrderStatus()));
         return orderInfo;
@@ -169,8 +184,8 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     @Override
     public boolean cancelOrder(Long orderId) {
         //1.超过取消时间不能取消
-        OrderInfo orderInfo = baseMapper.selectById(orderId);
-        DateTime dateTime = new DateTime(orderInfo.getQuitTime());
+        OrderInfo orderInfo = baseMapper.selectById(orderId);  //根据传入id查询订单信息
+        DateTime dateTime = new DateTime(orderInfo.getQuitTime());  // 获取取消时间
         if (dateTime.isBeforeNow()) {
             throw new YyghException();
         }
@@ -183,10 +198,13 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         reqMap.put("sign", "");
         JSONObject result = HttpRequestHelper.sendRequest(reqMap, "http://localhost:9998/order/updatePayStatus");
         if (result.getInteger("code") != 200) {
+            // 返回不是200则调用失败
             throw new YyghException(ResultCodeEnum.FAIL.getCode(), result.getString("message"));
         } else {
+            // 调用成功，将订单状态设置为cancle
             orderInfo.setOrderStatus(OrderStatusEnum.CANCLE.getStatus());
-            baseMapper.updateById(orderInfo);
+            baseMapper.updateById(orderInfo); // 更新到数据库
+            
             //发送消息更新预约数量，
             OrderMqVo orderMqVo = new OrderMqVo();
             orderMqVo.setScheduleId(orderInfo.getScheduleId());
@@ -196,18 +214,19 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             msmVo.setPhone(orderInfo.getPatientPhone());
             orderMqVo.setMsmVo(msmVo);
 
-            rabbitService.sendMessage(MqConst.EXCHANGE_DIRECT_ORDER, MqConst.ROUTING_ORDER, orderMqVo);
+            rabbitService.sendMessage(MqConst.EXCHANGE_DIRECT_ORDER, MqConst.ROUTING_ORDER, orderMqVo); // RabbitMQ 会根据前两个参数，把消息路由到 HospitalReceiver 监听的那个队列。
         }
         return true;
     }
 
-
+    // 定时任务
     @Override
     public void patientTips(String dateString) {
         LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(OrderInfo::getReserveDate,dateString)
-                        .ne(OrderInfo::getOrderStatus,OrderStatusEnum.CANCLE.getStatus());
-        List<OrderInfo> orderInfoList = baseMapper.selectList(wrapper);
+        wrapper.eq(OrderInfo::getReserveDate,dateString) // 预约日期
+                        .ne(OrderInfo::getOrderStatus,OrderStatusEnum.CANCLE.getStatus()); // 预约状态不是取消
+        
+        List<OrderInfo> orderInfoList = baseMapper.selectList(wrapper); // 根据条件查询数据库
         for (OrderInfo orderInfo : orderInfoList) {
             MsmVo msmVo = new MsmVo();
             msmVo.setPhone(orderInfo.getPatientPhone());

@@ -32,6 +32,7 @@ public interface ScheduleService {
     Schedule getScheduleId(String id);
 
     //下单辅助方法：根据排班主键查询排班订单信息
+    // 根据排班id查询预约挂号相关数据
     ScheduleOrderVo getScheduleOrderVo(String scheduleId);
 
     //修改排班信息

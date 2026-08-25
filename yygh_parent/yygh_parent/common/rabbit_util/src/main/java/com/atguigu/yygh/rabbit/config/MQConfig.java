@@ -10,6 +10,7 @@ public class MQConfig {
 
     @Bean
     public MessageConverter messageConverter() {
+        // 生产者 Java对象 → JSON序列化 → RabbitMQ → JSON消息 → JSON反序列化 → 消费者 Java对象
         return new Jackson2JsonMessageConverter();
     }
 }

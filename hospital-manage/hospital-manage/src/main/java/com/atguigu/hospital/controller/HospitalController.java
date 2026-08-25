@@ -28,6 +28,8 @@ public class HospitalController {
      * 预约下单
      */
     @PostMapping("/order/submitOrder")
+    // todo 改名
+    // submitOrder
     public Result AgreeAccountLendProject(HttpServletRequest request, HttpServletResponse response) {
         try {
             Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());

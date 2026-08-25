@@ -15,4 +15,12 @@ export default {
             method: `get`
         })
     },
+    //当前登录用户的挂号订单分页列表
+    getPageList(page, limit, searchObj) {
+        return request({
+            url: `${api_name}/auth/${page}/${limit}`,
+            method: 'get',
+            params: searchObj || {}
+        })
+    },
 }

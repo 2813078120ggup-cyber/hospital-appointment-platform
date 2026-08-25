@@ -100,7 +100,7 @@ public class ApiServiceImpl implements ApiService {
         paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
         paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
 
-        //  http://localhost:8201/api/hosp/saveHospital
+        //  http://192.168.6.101:8201/api/hosp/saveHospital
         //调用平台接口，使用httpclient
         JSONObject respone =
                 HttpRequestHelper.sendRequest(paramMap,
@@ -345,7 +345,7 @@ public class ApiServiceImpl implements ApiService {
             paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
             paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
 
-            JSONObject respone = HttpRequestHelper.sendRequest(paramMap, "http://localhost:8201/api/hosp/saveHospital");
+            JSONObject respone = HttpRequestHelper.sendRequest(paramMap, "http://192.168.6.101:8201/api/hosp/saveHospital");
             System.out.println(respone.toJSONString());
             if (null == respone || 200 != respone.getIntValue("code")) {
                 throw new YyghException(respone.getString("message"), 201);

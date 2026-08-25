@@ -30,7 +30,7 @@ public class HospSetServiceImpl implements HospSetService {
             hospitalSet.setId(1L);
             hospitalSet.setSignKey(sign);
             hospitalSet.setHoscode(hoscode);
-            hospitalSet.setApiUrl("http://localhost:8201");
+            hospitalSet.setApiUrl("http://192.168.6.101:8201");
             hospitalSetMapper.insert(hospitalSet);
         } else {
             hospitalSet.setSignKey(sign);

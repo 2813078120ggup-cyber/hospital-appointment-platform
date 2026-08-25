@@ -8,7 +8,7 @@
 		var defaults={
 			key:"privince|city",                                                //下拉列表联动id
 			value:"1|1066",                                                     //下拉列表联动value
-			path:"http://localhost:9000/dict/parId/"       //下拉列表联动数据获取
+			path:"http://192.168.6.101:9000/dict/parId/"       //下拉列表联动数据获取
 		};
 	
 		var options=$.extend(defaults,options);

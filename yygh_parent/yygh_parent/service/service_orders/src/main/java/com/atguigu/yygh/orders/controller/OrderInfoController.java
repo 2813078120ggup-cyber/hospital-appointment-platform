@@ -6,8 +6,13 @@ import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRule;
 import com.alibaba.csp.sentinel.slots.block.flow.param.ParamFlowRuleManager;
 import com.atguigu.yygh.common.result.R;
 import com.atguigu.yygh.model.order.OrderInfo;
+import com.atguigu.yygh.common.exception.YyghException;
+import com.atguigu.yygh.common.utils.AuthContextHolder;
 import com.atguigu.yygh.orders.service.OrderInfoService;
 import com.atguigu.yygh.vo.order.OrderCountQueryVo;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +43,26 @@ public class OrderInfoController {
     public R getOrders(@PathVariable("orderId") Long orderId) {
         OrderInfo orderInfo = orderInfoService.getOrderInfo(orderId);
         return R.ok().data("orderInfo", orderInfo);
+    }
+
+    /**
+     * 当前登录用户的挂号订单列表。
+     * 用户 ID 从 token 中解析，接口不接受 userId 参数，避免越权查询。
+     */
+    @GetMapping("auth/{page}/{limit}")
+    public R list(@PathVariable("page") Long page,
+                  @PathVariable("limit") Long limit,
+                  HttpServletRequest request) {
+        Long userId = AuthContextHolder.getUserId(request);
+        if (userId == null) {
+            throw new YyghException(20001, "请先登录");
+        }
+
+        long current = page == null || page < 1 ? 1 : page;
+        long size = limit == null || limit < 1 ? 10 : Math.min(limit, 100);
+        Page<OrderInfo> pageParam = new Page<>(current, size);
+        IPage<OrderInfo> pageModel = orderInfoService.selectPageByUserId(pageParam, userId);
+        return R.ok().data("pageModel", pageModel);
     }
 
     @GetMapping("auth/cancelOrder/{orderId}")
