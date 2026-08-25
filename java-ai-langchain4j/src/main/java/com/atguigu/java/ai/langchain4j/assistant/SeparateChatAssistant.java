@@ -12,7 +12,8 @@ import static dev.langchain4j.service.spring.AiServiceWiringMode.EXPLICIT;
         wiringMode = EXPLICIT,
         chatModel = "openAiChatModel",
         //chatMemory = "chatMemory",
-        chatMemoryProvider = "chatMemoryProvider"
+        chatMemoryProvider = "chatMemoryProvider",
+        tools = "calculatorTools"  // 配置tools  Bean命名规则：CalculatorTools -> calculatorTools
 )
 public interface SeparateChatAssistant {
     /**
@@ -38,4 +39,7 @@ public interface SeparateChatAssistant {
             @V("username") String username,
             @V("age") int age
     );
+    
+    
+    
 }
