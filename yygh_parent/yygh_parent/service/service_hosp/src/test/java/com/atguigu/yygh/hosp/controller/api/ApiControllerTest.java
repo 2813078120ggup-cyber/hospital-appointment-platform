@@ -1,7 +1,9 @@
 package com.atguigu.yygh.hosp.controller.api;
 
 import com.atguigu.yygh.common.result.Result;
+import com.atguigu.yygh.common.result.R;
 import com.atguigu.yygh.hosp.service.ScheduleService;
+import com.atguigu.yygh.model.hosp.Schedule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -62,6 +64,28 @@ class ApiControllerTest {
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void returnsMinimalScheduleDataForAuthenticatedBookingFlow() {
+        MockHttpServletRequest request = request("内科", "2026-08-26", "上午", null);
+        Schedule schedule = new Schedule();
+        schedule.setId("schedule-1");
+        schedule.setHoscode("1000");
+        schedule.setDepcode("dept-1");
+        schedule.setDocname("张医生");
+        schedule.setAvailableNumber(3);
+        schedule.getParam().put("hosname", "测试医院");
+        schedule.getParam().put("depname", "内科");
+        when(scheduleService.findAvailableSchedule("内科", "2026-08-26", "上午", null))
+                .thenReturn(schedule);
+
+        R result = apiController.selectAvailableSchedule(request);
+
+        assertThat(result.getCode()).isEqualTo(20000);
+        java.util.Map<?, ?> scheduleData = (java.util.Map<?, ?>) result.getData().get("schedule");
+        assertThat(scheduleData.get("scheduleId")).isEqualTo("schedule-1");
+        assertThat(scheduleData.containsKey("signKey")).isFalse();
     }
 
     private MockHttpServletRequest request(String name, String date, String time, String doctorName) {

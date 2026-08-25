@@ -27,6 +27,10 @@ public class OrderInfo extends BaseEntity {
     @TableField("patient_id")
     private Long patientId;
 
+    @ApiModelProperty(value = "平台订单号，用于跨系统幂等")
+    @TableField("platform_order_no")
+    private String platformOrderNo;
+
     @ApiModelProperty(value = "预约号序")
     @TableField("number")
     private Integer number;
@@ -56,4 +60,3 @@ public class OrderInfo extends BaseEntity {
     private Integer orderStatus;
 
 }
-

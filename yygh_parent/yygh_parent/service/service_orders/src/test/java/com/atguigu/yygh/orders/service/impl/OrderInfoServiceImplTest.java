@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class OrderInfoServiceImplTest {
@@ -46,6 +47,30 @@ class OrderInfoServiceImplTest {
 
         assertThrows(YyghException.class,
                 () -> orderInfoService.getOrderInfo(10L, 7L));
+    }
+
+    @Test
+    void returnsExistingOrderForRepeatedIdempotencyKey() {
+        OrderInfo existing = order(42L, 7L);
+        existing.setPatientId(5L);
+        existing.setScheduleId("schedule-1");
+        when(orderInfoMapper.selectOne(any())).thenReturn(existing);
+
+        Long orderId = orderInfoService.createOrder(
+                "schedule-1", 5L, 7L, "ai-appointment-12");
+
+        assertEquals(42L, orderId);
+    }
+
+    @Test
+    void findsExistingOrderWithoutCreatingANewOne() {
+        OrderInfo existing = order(42L, 7L);
+        when(orderInfoMapper.selectOne(any())).thenReturn(existing);
+
+        Long orderId = orderInfoService.findOrderIdByIdempotencyKey(
+                7L, "ai-appointment-12");
+
+        assertEquals(42L, orderId);
     }
 
     private OrderInfo order(Long orderId, Long userId) {

@@ -15,7 +15,9 @@ import java.util.Map;
 public interface OrderInfoService extends IService<OrderInfo> {
 
     //下单
-    Long createOrder(String scheduleId, Long patientId, Long userId);
+    Long createOrder(String scheduleId, Long patientId, Long userId, String idempotencyKey);
+
+    Long findOrderIdByIdempotencyKey(Long userId, String idempotencyKey);
 
     //获取订单信息
     OrderInfo getOrderInfo(Long orderId, Long userId);

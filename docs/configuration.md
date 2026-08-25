@@ -25,6 +25,10 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `YYGH_HOSPITAL_BOOTSTRAP_TOKEN` | 必需 | 平台首次向医院模拟端同步签名密钥的独立引导令牌 |
 | `YYGH_HOSPITAL_MANAGE_URL` | 本地联调 | 医院模拟端地址，默认 `http://localhost:9998` |
 | `YYGH_PLATFORM_API_URL` | 本地联调 | 医院模拟端调用平台的地址，默认 `http://localhost:8201` |
+| `YYGH_SERVICE_HOSP_URL` | AI 查号 | AI 调用公开查号接口，默认 `http://localhost:8201` |
+| `YYGH_GATEWAY_URL` | AI 正式预约 | AI 转发用户登录令牌并创建正式订单，默认 `http://localhost:8222` |
+| `XIAOZHI_DATASOURCE_URL` / `XIAOZHI_DB_USERNAME` / `XIAOZHI_DB_PASSWORD` | AI 服务 | AI 预约关联库，默认连接本机 `guiguxiaozhi` |
+| `XIAOZHI_MONGODB_URI` | AI 服务 | AI 对话记忆 MongoDB URI，默认 `mongodb://localhost:27017/chat_memory_db` |
 
 ## 第三方能力
 
@@ -47,6 +51,7 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 - 管理端通过 `yygh-admin/yygh-admin/.env.development` 的 `VUE_APP_BASE_API` 指向网关。
 - 用户门户使用 `NUXT_ENV_API_BASE_URL`，默认 `http://localhost:8222`。
 - 部署时应把浏览器请求地址改为 HTTPS 公网网关，并同步配置 CORS、OAuth 回调和反向代理。
+- 调用 AI `/xiaozhi/chat` 时，登录用户应使用 `token` 或 `X-Token` 请求头传递现有 JWT。令牌只在当前请求线程中转发给网关，不写入提示词、聊天记忆或预约表。
 
 ## 凭据轮换
 

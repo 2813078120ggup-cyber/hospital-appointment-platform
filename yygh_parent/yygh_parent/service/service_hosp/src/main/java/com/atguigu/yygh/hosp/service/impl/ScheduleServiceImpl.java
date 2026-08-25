@@ -113,6 +113,14 @@ public class ScheduleServiceImpl implements ScheduleService {
                                         String date,
                                         String time,
                                         String doctorName) {
+        return findAvailableSchedule(departmentName, date, time, doctorName) != null;
+    }
+
+    @Override
+    public Schedule findAvailableSchedule(String departmentName,
+                                           String date,
+                                           String time,
+                                           String doctorName) {
         if (departmentName == null || departmentName.trim().isEmpty()) {
             throw new IllegalArgumentException("科室名称不能为空");
         }
@@ -123,14 +131,15 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<Department> departments = departmentService.findByDepname(departmentName.trim());
 
         if (departments == null || departments.isEmpty()) {
-            return false;
+            return null;
         }
 
+        Schedule selectedSchedule = null;
         for (Department department : departments) {
-            boolean available;
+            Schedule candidate;
             if (normalizedDoctorName == null || normalizedDoctorName.isEmpty()) {
-                available = scheduleRepository
-                        .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThan(
+                candidate = scheduleRepository
+                        .findFirstByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThanOrderByAvailableNumberDesc(
                                 department.getHoscode(),
                                 department.getDepcode(),
                                 workDate,
@@ -138,8 +147,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                                 1,
                                 0);
             } else {
-                available = scheduleRepository
-                        .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThan(
+                candidate = scheduleRepository
+                        .findFirstByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThanOrderByAvailableNumberDesc(
                                 department.getHoscode(),
                                 department.getDepcode(),
                                 workDate,
@@ -148,11 +157,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                                 1,
                                 0);
             }
-            if (available) {
-                return true;
+            if (candidate != null && (selectedSchedule == null
+                    || candidate.getAvailableNumber() > selectedSchedule.getAvailableNumber())) {
+                selectedSchedule = candidate;
             }
         }
-        return false;
+        // 对多院区同名科室选择剩余号源更多的排班，并补齐前端及 AI 所需的医院、科室名称。
+        return selectedSchedule == null ? null : packageSchedule(selectedSchedule);
     }
 
     private Date parseWorkDate(String date) {

@@ -25,25 +25,41 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.extern.slf4j.Slf4j;
 import org.joda.time.DateTime;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.security.SecureRandom;
+import java.util.UUID;
 
 /**
  * 订单表 服务实现类
  */
 @Service
+@Slf4j
 public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo> implements OrderInfoService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final Duration IDEMPOTENCY_LOCK_TTL = Duration.ofMinutes(2);
+    private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+                    + "return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class);
 
     @Autowired
     private PatientFeignClient patientFeignClient;
@@ -60,12 +76,75 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
     @Autowired
     private WeixinService weixinService;
 
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
 
     @Override
-    public Long createOrder(String scheduleId, Long patientId, Long userId) {
+    public Long createOrder(String scheduleId,
+                            Long patientId,
+                            Long userId,
+                            String idempotencyKey) {
         if (userId == null) {
             throw new YyghException(20001, "请先登录");
         }
+        if (!StringUtils.hasText(idempotencyKey)) {
+            return createOrderInternal(scheduleId, patientId, userId, newRandomOutTradeNo());
+        }
+
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        String outTradeNo = createIdempotentOutTradeNo(userId, normalizedKey);
+        OrderInfo existingOrder = findIdempotentOrder(outTradeNo, scheduleId, patientId, userId);
+        if (existingOrder != null) {
+            return existingOrder.getId();
+        }
+
+        String lockKey = "order:submit:" + outTradeNo;
+        String lockValue = UUID.randomUUID().toString();
+        boolean acquired;
+        try {
+            acquired = Boolean.TRUE.equals(redisTemplate.opsForValue()
+                    .setIfAbsent(lockKey, lockValue, IDEMPOTENCY_LOCK_TTL));
+        } catch (DataAccessException exception) {
+            // 功能完善：幂等基础设施不可用时拒绝继续扣号，避免降级为可能重复下单。
+            throw new YyghException(20001, "订单幂等服务暂不可用，请稍后重试");
+        }
+        if (!acquired) {
+            existingOrder = findIdempotentOrder(outTradeNo, scheduleId, patientId, userId);
+            if (existingOrder != null) {
+                return existingOrder.getId();
+            }
+            throw new YyghException(20001, "订单正在处理中，请勿重复提交");
+        }
+
+        try {
+            // 获取锁后再次查询，覆盖多个实例同时进入首次查询的竞态窗口。
+            existingOrder = findIdempotentOrder(outTradeNo, scheduleId, patientId, userId);
+            return existingOrder == null
+                    ? createOrderInternal(scheduleId, patientId, userId, outTradeNo)
+                    : existingOrder.getId();
+        } finally {
+            releaseIdempotencyLock(lockKey, lockValue);
+        }
+    }
+
+    @Override
+    public Long findOrderIdByIdempotencyKey(Long userId, String idempotencyKey) {
+        if (userId == null) {
+            throw new YyghException(20001, "请先登录");
+        }
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        String outTradeNo = createIdempotentOutTradeNo(userId, normalizedKey);
+        LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderInfo::getOutTradeNo, outTradeNo)
+                .eq(OrderInfo::getUserId, userId);
+        OrderInfo existingOrder = baseMapper.selectOne(wrapper);
+        return existingOrder == null ? null : existingOrder.getId();
+    }
+
+    private Long createOrderInternal(String scheduleId,
+                                     Long patientId,
+                                     Long userId,
+                                     String outTradeNo) {
         //根据排班id获取排班数据
         ScheduleOrderVo scheduleOrderVo = hospitalFeignClient.getScheduleOrderVo(scheduleId);
         if (scheduleOrderVo == null) {
@@ -87,6 +166,8 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
         paramMap.put("reserveDate", new DateTime(scheduleOrderVo.getReserveDate()).toString("yyyy-MM-dd"));
         paramMap.put("reserveTime", scheduleOrderVo.getReserveTime());
         paramMap.put("amount", scheduleOrderVo.getAmount());
+        // 医院模拟端也使用平台交易号执行幂等校验，覆盖医院成功但平台响应丢失后的重试。
+        paramMap.put("platformOrderNo", outTradeNo);
 
         paramMap.put("name", patient.getName());
         paramMap.put("certificatesType", patient.getCertificatesType());
@@ -127,9 +208,6 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
             //封装排班信息
             BeanUtils.copyProperties(scheduleOrderVo, orderInfo);
             //封装就诊人信息
-            // 功能完善：交易号保持在支付表 30 字符限制内，并增加随机熵降低并发碰撞概率。
-            String outTradeNo = System.currentTimeMillis()
-                    + String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
             orderInfo.setOutTradeNo(outTradeNo);
             orderInfo.setScheduleId(scheduleId);
             orderInfo.setUserId(patient.getUserId());
@@ -174,8 +252,65 @@ public class OrderInfoServiceImpl extends ServiceImpl<OrderInfoMapper, OrderInfo
 
             return orderInfo.getId(); //主键回填
         } else {
-            System.out.println("下单失败");
             throw new YyghException(20001, "下单失败");
+        }
+    }
+
+    private OrderInfo findIdempotentOrder(String outTradeNo,
+                                          String scheduleId,
+                                          Long patientId,
+                                          Long userId) {
+        LambdaQueryWrapper<OrderInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(OrderInfo::getOutTradeNo, outTradeNo);
+        OrderInfo existingOrder = baseMapper.selectOne(wrapper);
+        if (existingOrder == null) {
+            return null;
+        }
+        if (!Objects.equals(existingOrder.getUserId(), userId)
+                || !Objects.equals(existingOrder.getPatientId(), patientId)
+                || !Objects.equals(existingOrder.getScheduleId(), scheduleId)) {
+            throw new YyghException(20001, "幂等键已用于其他订单");
+        }
+        return existingOrder;
+    }
+
+    private String newRandomOutTradeNo() {
+        // 交易号保持在支付表 30 字符限制内，并增加随机熵降低并发碰撞概率。
+        return System.currentTimeMillis() + String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+    }
+
+    private String createIdempotentOutTradeNo(Long userId, String idempotencyKey) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((userId + ":" + idempotencyKey)
+                    .getBytes(StandardCharsets.UTF_8));
+            StringBuilder value = new StringBuilder("AI");
+            for (int index = 0; index < 14; index++) {
+                value.append(String.format("%02x", bytes[index]));
+            }
+            return value.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        if (!StringUtils.hasText(idempotencyKey)) {
+            throw new YyghException(20001, "幂等键不能为空");
+        }
+        String normalizedKey = idempotencyKey.trim();
+        if (normalizedKey.length() > 128 || !normalizedKey.matches("[A-Za-z0-9._:-]+")) {
+            throw new YyghException(20001, "幂等键格式不正确");
+        }
+        return normalizedKey;
+    }
+
+    private void releaseIdempotencyLock(String lockKey, String lockValue) {
+        try {
+            redisTemplate.execute(RELEASE_LOCK_SCRIPT, Collections.singletonList(lockKey), lockValue);
+        } catch (RuntimeException exception) {
+            // 锁有 TTL，释放失败只记录无敏感信息的键；不得覆盖已经完成的订单结果。
+            log.warn("释放订单幂等锁失败，lockKey={}", lockKey, exception);
         }
     }
 

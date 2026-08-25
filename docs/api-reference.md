@@ -98,6 +98,8 @@ Controller：`ApiController`  ·  端口：`8201`  ·  源码：`yygh_parent/yyg
 
 | 方法 | 路径 | 用途 | 访问范围 | 参数摘要 | 返回类型 |
 | --- | --- | --- | --- | --- | --- |
+| `POST` | `/api/hosp/selectSchedule` | 查询是否有号源 | 公开 | Form：科室、日期、时间、可选医生 | `Result<Boolean>` |
+| `POST` | `/api/hosp/auth/selectSchedule` | 解析正式下单排班 | 登录用户 | Form：科室、日期、时间、可选医生 | `R` |
 | `POST` | `/api/hosp/schedule/remove` | 删除排班 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/schedule/list` | 获取排班分页列表 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/saveSchedule` | 上传排班 | 公开/按业务校验 | — | `Result` |
@@ -190,7 +192,8 @@ Controller：`OrderInfoController`  ·  端口：`8207`  ·  源码：`yygh_pare
 
 | 方法 | 路径 | 用途 | 访问范围 | 参数摘要 | 返回类型 |
 | --- | --- | --- | --- | --- | --- |
-| `POST` | `/api/order/orderInfo/auth/submitOrder/{scheduleId}/{patientId}` | submitOrder | 登录用户 | PathVariable  String scheduleId; PathVariable  Long patientId | `R` |
+| `POST` | `/api/order/orderInfo/auth/submitOrder/{scheduleId}/{patientId}` | 创建正式订单 | 登录用户 | PathVariable：排班、就诊人；可选 `Idempotency-Key` 请求头 | `R` |
+| `GET` | `/api/order/orderInfo/auth/findByIdempotencyKey` | 查询幂等订单 | 登录用户 | 必填 `Idempotency-Key` 请求头；不会创建订单 | `R` |
 | `GET` | `/api/order/orderInfo/auth/getOrders/{orderId}` | getOrders | 登录用户 | PathVariable  Long orderId | `R` |
 | `GET` | `/api/order/orderInfo/auth/cancelOrder/{orderId}` | cancelOrder | 登录用户 | PathVariable  Long orderId | `R` |
 | `POST` | `/api/order/orderInfo/inner/getCountMap` | getCountMap | 内部调用 | RequestBody  OrderCountQueryVo orderCountQueryVo | `Map<String,Object>` |

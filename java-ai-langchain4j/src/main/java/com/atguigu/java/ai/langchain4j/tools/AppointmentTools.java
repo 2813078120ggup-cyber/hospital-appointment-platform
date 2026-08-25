@@ -1,9 +1,11 @@
 package com.atguigu.java.ai.langchain4j.tools;
 
+import com.atguigu.java.ai.langchain4j.context.AuthenticatedRequestContext;
 import com.atguigu.java.ai.langchain4j.entity.Appointment;
 import com.atguigu.java.ai.langchain4j.service.AppointmentService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
+import dev.langchain4j.agent.tool.ToolMemoryId;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,41 +13,372 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 @Slf4j
 public class AppointmentTools {
 
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_SUBMITTED = "SUBMITTED";
+
     private final AppointmentService appointmentService;
     private final RestTemplate restTemplate;
     private final String serviceHospUrl;
+    private final String gatewayUrl;
 
     @Autowired
     public AppointmentTools(AppointmentService appointmentService,
                             RestTemplateBuilder restTemplateBuilder,
-                            @Value("${yygh.service-hosp-url:http://localhost:8201}") String serviceHospUrl) {
+                            @Value("${yygh.service-hosp-url:http://localhost:8201}") String serviceHospUrl,
+                            @Value("${yygh.gateway-url:http://localhost:8222}") String gatewayUrl) {
         this.appointmentService = appointmentService;
-        // 功能完善：远程号源查询设置连接和读取超时，避免 AI 对话线程无限等待。
+        // 功能完善：远程调用设置连接和读取超时，避免 AI 对话线程无限等待。
         this.restTemplate = restTemplateBuilder
                 .setConnectTimeout(Duration.ofSeconds(3))
-                .setReadTimeout(Duration.ofSeconds(5))
+                .setReadTimeout(Duration.ofSeconds(10))
                 .build();
-        this.serviceHospUrl = serviceHospUrl.replaceAll("/+$", "");
+        this.serviceHospUrl = normalizeBaseUrl(serviceHospUrl);
+        this.gatewayUrl = normalizeBaseUrl(gatewayUrl);
     }
 
-    @Tool(name="预约挂号", value = "根据参数，先执行工具方法querySchedule查询是否可预约，并直接给用户回答是否可预约，并让用户确认所有预约信息，用户确认后再进行预约。")
-    public String bookAppointment(Appointment appointment){
+    @Tool(name = "预约挂号", value = "根据参数查询号源。用户确认预约信息后，使用当前登录账号下匹配的就诊人创建平台正式订单。")
+    public String bookAppointment(@ToolMemoryId Long memoryId, Appointment appointment) {
+        String validationMessage = validateAppointment(appointment);
+        if (validationMessage != null) {
+            return validationMessage;
+        }
 
+        String token = AuthenticatedRequestContext.getToken();
+        if (!StringUtils.hasText(token)) {
+            return "查询号源无需登录，但正式预约需要先登录医院预约挂号平台";
+        }
+
+        try {
+            PatientReference patient = findOwnedPatient(token, appointment);
+            if (patient == null) {
+                return "当前账号中未找到姓名和身份证号完全匹配的就诊人，请先在就诊人管理中添加或核对信息";
+            }
+
+            Appointment appointmentDB = appointmentService.getOne(appointment);
+            if (appointmentDB != null && appointmentDB.getPlatformOrderId() != null) {
+                if (!Objects.equals(appointmentDB.getPatientId(), patient.id())) {
+                    return "该预约记录与当前账号的就诊人不匹配，请联系管理员处理";
+                }
+                return "您已完成该时段的正式预约，平台订单号：" + appointmentDB.getPlatformOrderId();
+            }
+
+            if (appointmentDB == null) {
+                ScheduleReference schedule = findAvailableSchedule(token, appointment);
+                if (schedule == null) {
+                    return "当前条件暂无可预约号源，请更换日期、时间或医生";
+                }
+                appointmentDB = createPendingAppointment(appointment, patient, schedule);
+            } else {
+                // 功能完善：失败重试沿用首次选定的排班和就诊人，保证幂等键不会漂移到另一订单。
+                if (appointmentDB.getPatientId() != null
+                        && !Objects.equals(appointmentDB.getPatientId(), patient.id())) {
+                    return "该预约记录与当前账号的就诊人不匹配，请联系管理员处理";
+                }
+                boolean associationChanged = false;
+                if (appointmentDB.getPatientId() == null) {
+                    appointmentDB.setPatientId(patient.id());
+                    associationChanged = true;
+                }
+                if (!StringUtils.hasText(appointmentDB.getScheduleId())) {
+                    ScheduleReference schedule = findAvailableSchedule(token, appointment);
+                    if (schedule == null) {
+                        return "当前条件暂无可预约号源，请更换日期、时间或医生";
+                    }
+                    appointmentDB.setScheduleId(schedule.id());
+                    appointmentDB.setStatus(STATUS_PENDING);
+                    associationChanged = true;
+                }
+                if (associationChanged && !appointmentService.updateById(appointmentDB)) {
+                    return "预约关联信息保存失败，请稍后重试";
+                }
+            }
+
+            // 并发插入冲突可能返回另一线程刚创建的记录，因此提交前统一复核归属与排班关联。
+            if (!Objects.equals(appointmentDB.getPatientId(), patient.id())
+                    || !StringUtils.hasText(appointmentDB.getScheduleId())) {
+                return "预约记录关联不完整，请稍后重试";
+            }
+
+            Long orderId = submitOfficialOrder(token, appointmentDB);
+            appointmentDB.setPlatformOrderId(orderId);
+            appointmentDB.setStatus(STATUS_SUBMITTED);
+            if (!appointmentService.updateById(appointmentDB)) {
+                // 平台订单已创建；幂等键会保证用户重试时取回同一个订单，再补写本地关联。
+                log.warn("平台订单已创建但 AI 预约关联更新失败，appointmentId={}", appointmentDB.getId());
+                return "正式订单已创建，订单号：" + orderId + "；本地关联稍后重试同步";
+            }
+            return "预约成功，已创建医院预约挂号平台正式订单，订单号：" + orderId;
+        } catch (AppointmentRemoteException exception) {
+            return exception.getMessage();
+        } catch (DataIntegrityViolationException exception) {
+            return "您在相同的科室和时间已有预约，请勿重复提交";
+        } catch (RuntimeException exception) {
+            log.error("AI 正式预约处理失败，memoryId={}", memoryId, exception);
+            return "预约服务暂时不可用，请稍后重试";
+        }
+    }
+
+    @Tool(name = "取消预约挂号", value = "取消当前登录用户的对应平台正式订单；只有平台取消成功后才删除 AI 本地预约记录。")
+    public String cancelAppointment(@ToolMemoryId Long memoryId, Appointment appointment) {
+        String validationMessage = validateAppointment(appointment);
+        if (validationMessage != null) {
+            return validationMessage;
+        }
+        String token = AuthenticatedRequestContext.getToken();
+        if (!StringUtils.hasText(token)) {
+            return "取消预约需要先登录医院预约挂号平台";
+        }
+
+        try {
+            Appointment appointmentDB = appointmentService.getOne(appointment);
+            if (appointmentDB == null) {
+                return "您没有对应的预约记录，请核对预约科室和时间";
+            }
+            PatientReference patient = findOwnedPatient(token, appointment);
+            if (patient == null || (appointmentDB.getPatientId() != null
+                    && !Objects.equals(appointmentDB.getPatientId(), patient.id()))) {
+                return "该预约不属于当前登录账号，无法取消";
+            }
+
+            Long officialOrderId = appointmentDB.getPlatformOrderId();
+            if (officialOrderId == null) {
+                // 响应丢失时本地可能还没有订单号；先只查询幂等结果，禁止取消动作意外创建新订单。
+                officialOrderId = findOfficialOrderByIdempotencyKey(token, appointmentDB.getId());
+            }
+            if (officialOrderId != null) {
+                cancelOfficialOrder(token, officialOrderId);
+            }
+            if (appointmentService.removeById(appointmentDB.getId())) {
+                return "取消预约成功";
+            }
+            return "平台订单已取消，但本地记录清理失败，请稍后重试";
+        } catch (AppointmentRemoteException exception) {
+            return exception.getMessage();
+        } catch (RuntimeException exception) {
+            log.error("AI 取消正式预约失败，memoryId={}", memoryId, exception);
+            return "取消预约服务暂时不可用，请稍后重试";
+        }
+    }
+
+    @Tool(name = "查询是否有号源", value = "根据科室名称、日期、时间和可选医生查询是否有号源")
+    public boolean querySchedule(
+            @P(value = "科室名称") String name,
+            @P(value = "日期") String date,
+            @P(value = "时间，可选值：上午、下午") String time,
+            @P(value = "医生名称", required = false) String doctorName) {
+        if (!StringUtils.hasText(name) || !StringUtils.hasText(date) || !StringUtils.hasText(time)) {
+            return false;
+        }
+
+        String url = serviceHospUrl + "/api/hosp/selectSchedule";
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    url, formRequest(null, name, date, time, doctorName), Map.class);
+            Map<String, Object> result = response.getBody();
+            return result != null && codeEquals(result.get("code"), 200)
+                    && Boolean.TRUE.equals(result.get("data"));
+        } catch (RuntimeException exception) {
+            log.warn("远程号源查询失败，url={}", url, exception);
+            return false;
+        }
+    }
+
+    private Appointment createPendingAppointment(Appointment source,
+                                                 PatientReference patient,
+                                                 ScheduleReference schedule) {
+        source.setId(null);
+        source.setPatientId(patient.id());
+        source.setScheduleId(schedule.id());
+        source.setPlatformOrderId(null);
+        source.setStatus(STATUS_PENDING);
+        try {
+            if (appointmentService.save(source)) {
+                return source;
+            }
+        } catch (DataIntegrityViolationException exception) {
+            Appointment existing = appointmentService.getOne(source);
+            if (existing != null) {
+                return existing;
+            }
+            throw exception;
+        }
+        throw new AppointmentRemoteException("保存预约确认记录失败，请稍后重试");
+    }
+
+    private PatientReference findOwnedPatient(String token, Appointment appointment) {
+        String url = gatewayUrl + "/api/user/patient/auth/findAll";
+        try {
+            HttpHeaders headers = authenticatedHeaders(token);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> data = requireSuccessData(response.getBody(), "获取就诊人失败");
+            Object rawList = data.get("list");
+            if (!(rawList instanceof List<?> patients)) {
+                return null;
+            }
+            String expectedName = appointment.getUsername().trim();
+            String expectedIdCard = normalizeIdCard(appointment.getIdCard());
+            for (Object item : patients) {
+                if (item instanceof Map<?, ?> patient
+                        && expectedName.equals(stringValue(patient.get("name")))
+                        && expectedIdCard.equals(normalizeIdCard(stringValue(patient.get("certificatesNo"))))) {
+                    Long patientId = longValue(patient.get("id"));
+                    return patientId == null ? null : new PatientReference(patientId);
+                }
+            }
+            return null;
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden exception) {
+            throw new AppointmentRemoteException("登录状态已失效，请重新登录后再预约");
+        } catch (AppointmentRemoteException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            log.warn("获取当前用户就诊人失败，url={}", url, exception);
+            throw new AppointmentRemoteException("暂时无法获取就诊人，请稍后重试");
+        }
+    }
+
+    private ScheduleReference findAvailableSchedule(String token, Appointment appointment) {
+        String url = gatewayUrl + "/api/hosp/auth/selectSchedule";
+        try {
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    url,
+                    formRequest(token, appointment.getDepartment(), appointment.getDate(),
+                            appointment.getTime(), appointment.getDoctorName()),
+                    Map.class);
+            Map<String, Object> data = requireSuccessData(response.getBody(), "暂无可预约号源");
+            Object rawSchedule = data.get("schedule");
+            if (!(rawSchedule instanceof Map<?, ?> schedule)) {
+                return null;
+            }
+            String scheduleId = stringValue(schedule.get("scheduleId"));
+            return StringUtils.hasText(scheduleId) ? new ScheduleReference(scheduleId) : null;
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden exception) {
+            throw new AppointmentRemoteException("登录状态已失效，请重新登录后再预约");
+        } catch (AppointmentRemoteException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            log.warn("解析正式排班失败，url={}", url, exception);
+            throw new AppointmentRemoteException("号源服务暂时不可用，请稍后重试");
+        }
+    }
+
+    private Long submitOfficialOrder(String token, Appointment appointment) {
+        String url = gatewayUrl + "/api/order/orderInfo/auth/submitOrder/"
+                + appointment.getScheduleId() + "/" + appointment.getPatientId();
+        try {
+            HttpHeaders headers = authenticatedHeaders(token);
+            headers.set("Idempotency-Key", "ai-appointment-" + appointment.getId());
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    url, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> data = requireSuccessData(response.getBody(), "正式订单创建失败");
+            Long orderId = longValue(data.get("orderId"));
+            if (orderId == null) {
+                throw new AppointmentRemoteException("正式订单创建失败：平台未返回订单号");
+            }
+            return orderId;
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden exception) {
+            throw new AppointmentRemoteException("登录状态已失效，请重新登录后再预约");
+        } catch (AppointmentRemoteException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            log.warn("创建平台正式订单失败，appointmentId={}", appointment.getId(), exception);
+            throw new AppointmentRemoteException("正式订单创建失败，请稍后重试");
+        }
+    }
+
+    private void cancelOfficialOrder(String token, Long orderId) {
+        String url = gatewayUrl + "/api/order/orderInfo/auth/cancelOrder/" + orderId;
+        try {
+            HttpHeaders headers = authenticatedHeaders(token);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> data = requireSuccessData(response.getBody(), "平台订单取消失败");
+            if (!Boolean.TRUE.equals(data.get("flag"))) {
+                throw new AppointmentRemoteException("平台订单取消失败，请稍后重试");
+            }
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden exception) {
+            throw new AppointmentRemoteException("登录状态已失效，请重新登录后再取消");
+        } catch (AppointmentRemoteException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            log.warn("取消平台正式订单失败，orderId={}", orderId, exception);
+            throw new AppointmentRemoteException("平台订单取消失败，请稍后重试");
+        }
+    }
+
+    private Long findOfficialOrderByIdempotencyKey(String token, Long appointmentId) {
+        String url = gatewayUrl + "/api/order/orderInfo/auth/findByIdempotencyKey";
+        try {
+            HttpHeaders headers = authenticatedHeaders(token);
+            headers.set("Idempotency-Key", "ai-appointment-" + appointmentId);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> data = requireSuccessData(response.getBody(), "查询正式订单失败");
+            return longValue(data.get("orderId"));
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden exception) {
+            throw new AppointmentRemoteException("登录状态已失效，请重新登录后再取消");
+        } catch (AppointmentRemoteException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            log.warn("按幂等键查询平台订单失败，appointmentId={}", appointmentId, exception);
+            throw new AppointmentRemoteException("查询正式订单失败，请稍后重试");
+        }
+    }
+
+    private HttpEntity<MultiValueMap<String, String>> formRequest(String token,
+                                                                  String name,
+                                                                  String date,
+                                                                  String time,
+                                                                  String doctorName) {
+        HttpHeaders headers = StringUtils.hasText(token)
+                ? authenticatedHeaders(token) : new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("name", name.trim());
+        formData.add("date", date.trim());
+        formData.add("time", time.trim());
+        if (StringUtils.hasText(doctorName)) {
+            formData.add("doctorName", doctorName.trim());
+        }
+        return new HttpEntity<>(formData, headers);
+    }
+
+    private HttpHeaders authenticatedHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("token", token);
+        return headers;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> requireSuccessData(Map<String, Object> result, String fallbackMessage) {
+        if (result == null || !codeEquals(result.get("code"), 20000)) {
+            String message = result == null ? null : stringValue(result.get("message"));
+            throw new AppointmentRemoteException(StringUtils.hasText(message) ? message : fallbackMessage);
+        }
+        Object data = result.get("data");
+        return data instanceof Map<?, ?> ? (Map<String, Object>) data : Map.of();
+    }
+
+    private String validateAppointment(Appointment appointment) {
         if (appointment == null || !StringUtils.hasText(appointment.getUsername())
                 || !StringUtils.hasText(appointment.getIdCard())
                 || !StringUtils.hasText(appointment.getDepartment())
@@ -53,85 +386,48 @@ public class AppointmentTools {
                 || !StringUtils.hasText(appointment.getTime())) {
             return "预约信息不完整，请补充姓名、身份证号、科室、日期和时间";
         }
-
-        // 功能完善：即使模型未按提示先调用查询工具，预约方法本身也必须再次确认号源。
-        if (!querySchedule(appointment.getDepartment(), appointment.getDate(),
-                appointment.getTime(), appointment.getDoctorName())) {
-            return "当前条件暂无可预约号源，请更换日期、时间或医生";
-        }
-
-        //查找数据库中是否包含对应的预约记录
-        Appointment appointmentDB = appointmentService.getOne(appointment);
-        if(appointmentDB == null){
-            appointment.setId(null);//防止大模型幻觉设置了id
-            try {
-                if(appointmentService.save(appointment)){
-                    return "预约成功，并返回预约详情";
-                }
-            } catch (DataIntegrityViolationException exception) {
-                // 数据库唯一约束负责兜底并发重复预约。
-                return "您在相同的科室和时间已有预约";
-            }
-            return "预约失败";
-        }
-        return "您在相同的科室和时间已有预约";
+        return null;
     }
 
-    @Tool(name="取消预约挂号", value = "根据参数，查询预约是否存在，如果存在则删除预约记录并返回取消预约成功，否则返回取消预约失败")
-    public String cancelAppointment(Appointment appointment){
-        Appointment appointmentDB = appointmentService.getOne(appointment);
-        if(appointmentDB != null){
-            //删除预约记录
-            if(appointmentService.removeById(appointmentDB.getId())){
-                return "取消预约成功";
-            }else{
-                return "取消预约失败";
-            }
-        }
-        //取消失败
-        return "您没有预约记录，请核对预约科室和时间";
+    private boolean codeEquals(Object value, int expected) {
+        return value instanceof Number && ((Number) value).intValue() == expected;
     }
 
-    @Tool(name = "查询是否有号源", value="根据科室名称，日期，时间和医生查询是否有号源，并返回给用户")
-    public boolean querySchedule(
-            @P(value = "科室名称") String name,
-            @P(value = "日期") String date,
-            @P(value = "时间，可选值：上午、下午") String time,
-            @P(value = "医生名称", required = false) String doctorName
-    ) {
-        if (!StringUtils.hasText(name) || !StringUtils.hasText(date) || !StringUtils.hasText(time)) {
-            log.warn("号源查询缺少必填参数: name={}, date={}, time={}", name, date, time);
-            return false;
+    private Long longValue(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
         }
-
-        String url = serviceHospUrl + "/api/hosp/selectSchedule";
-
+        if (value == null) {
+            return null;
+        }
         try {
-            // 设置请求头为表单提交格式
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            // 封装表单参数
-            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-            formData.add("name", name);
-            formData.add("date", date);
-            formData.add("time", time);
-            if (StringUtils.hasText(doctorName)) {
-                formData.add("doctorName", doctorName);
-            }
-
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(formData, headers);
-
-            // 发送POST请求
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
-            Map<String, Object> result = response.getBody();
-
-            // 功能完善：只接受平台明确返回的成功状态，异常或无号均按不可预约处理。
-            return result != null && Integer.valueOf(200).equals(result.get("code"));
-        } catch (Exception e) {
-            log.warn("远程号源查询失败，url={}", url, e);
+            return Long.valueOf(value.toString());
+        } catch (NumberFormatException exception) {
+            return null;
         }
+    }
 
-        return false;
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString().trim();
+    }
+
+    private String normalizeIdCard(String value) {
+        return StringUtils.hasText(value) ? value.trim().toUpperCase() : "";
+    }
+
+    private String normalizeBaseUrl(String value) {
+        return value == null ? "" : value.trim().replaceAll("/+$", "");
+    }
+
+    private record PatientReference(Long id) {
+    }
+
+    private record ScheduleReference(String id) {
+    }
+
+    private static final class AppointmentRemoteException extends RuntimeException {
+        private AppointmentRemoteException(String message) {
+            super(message);
+        }
     }
 }

@@ -2,7 +2,10 @@ package com.atguigu.yygh.hosp.service.impl;
 
 import com.atguigu.yygh.hosp.repository.ScheduleRepository;
 import com.atguigu.yygh.hosp.service.DepartmentService;
+import com.atguigu.yygh.hosp.service.HospitalService;
 import com.atguigu.yygh.model.hosp.Department;
+import com.atguigu.yygh.model.hosp.Hospital;
+import com.atguigu.yygh.model.hosp.Schedule;
 import org.joda.time.DateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +31,9 @@ class ScheduleServiceImplTest {
     @Mock
     private DepartmentService departmentService;
 
+    @Mock
+    private HospitalService hospitalService;
+
     @InjectMocks
     private ScheduleServiceImpl scheduleService;
 
@@ -36,10 +42,12 @@ class ScheduleServiceImplTest {
         Department department = department("1000", "200040878");
         Date workDate = new DateTime("2026-08-26").withTimeAtStartOfDay().toDate();
         when(departmentService.findByDepname("内科")).thenReturn(List.of(department));
+        Schedule schedule = schedule("1000", "200040878", 8);
         when(scheduleRepository
-                .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThan(
+                .findFirstByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThanOrderByAvailableNumberDesc(
                         "1000", "200040878", workDate, 0, 1, 0))
-                .thenReturn(true);
+                .thenReturn(schedule);
+        stubPackageData(department);
 
         boolean available = scheduleService.hasAvailableSchedule("内科", "2026-08-26", "上午", null);
 
@@ -51,17 +59,19 @@ class ScheduleServiceImplTest {
         Department department = department("1000", "200040878");
         Date workDate = new DateTime("2026-08-26").withTimeAtStartOfDay().toDate();
         when(departmentService.findByDepname("内科")).thenReturn(List.of(department));
+        Schedule schedule = schedule("1000", "200040878", 3);
         when(scheduleRepository
-                .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThan(
+                .findFirstByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndDocnameAndStatusAndAvailableNumberGreaterThanOrderByAvailableNumberDesc(
                         "1000", "200040878", workDate, 1, "张医生", 1, 0))
-                .thenReturn(true);
+                .thenReturn(schedule);
+        stubPackageData(department);
 
         boolean available = scheduleService.hasAvailableSchedule(
                 "内科", "2026-08-26", "下午", " 张医生 ");
 
         assertThat(available).isTrue();
         verify(scheduleRepository, never())
-                .existsByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThan(
+                .findFirstByHoscodeAndDepcodeAndWorkDateAndWorkTimeAndStatusAndAvailableNumberGreaterThanOrderByAvailableNumberDesc(
                         "1000", "200040878", workDate, 1, 1, 0);
     }
 
@@ -88,5 +98,23 @@ class ScheduleServiceImplTest {
         department.setHoscode(hoscode);
         department.setDepcode(depcode);
         return department;
+    }
+
+    private Schedule schedule(String hoscode, String depcode, int availableNumber) {
+        Schedule schedule = new Schedule();
+        schedule.setId("schedule-1");
+        schedule.setHoscode(hoscode);
+        schedule.setDepcode(depcode);
+        schedule.setAvailableNumber(availableNumber);
+        return schedule;
+    }
+
+    private void stubPackageData(Department department) {
+        Hospital hospital = new Hospital();
+        hospital.setHosname("测试医院");
+        department.setDepname("内科");
+        when(hospitalService.getHosp(department.getHoscode())).thenReturn(hospital);
+        when(departmentService.getDepartment(department.getHoscode(), department.getDepcode()))
+                .thenReturn(department);
     }
 }

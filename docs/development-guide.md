@@ -24,7 +24,16 @@ Get-Content database\schema\yygh_hosp.sql -Raw | mysql -u root -p
 Get-Content database\schema\yygh_manage.sql -Raw | mysql -u root -p
 Get-Content database\schema\yygh_order.sql -Raw | mysql -u root -p
 Get-Content database\schema\yygh_user.sql -Raw | mysql -u root -p
+Get-Content java-ai-langchain4j\database\create.sql -Raw | mysql -u root -p
 ```
+
+基础建表完成后执行条件迁移；存量数据库不要重新执行含 `DROP TABLE` 的初始化脚本，只需先备份再执行同一迁移：
+
+```powershell
+Get-Content database\migrations\20260825_add_ai_formal_order_support.sql -Raw | mysql -u root -p
+```
+
+该脚本会先检查字段和索引是否存在，因此可重复执行。它为医院模拟端订单增加跨系统幂等号，并为 AI 预约记录增加平台就诊人、排班和正式订单关联字段。
 
 完整功能需要字典等基础数据。请从可信来源筛选非敏感 INSERT，禁止导入或提交真实用户、证件、手机号、订单和支付数据。字段说明见 [数据库字典](database-dictionary.md)。
 
@@ -57,7 +66,8 @@ mvn -DskipTests package
 2. 启动业务服务：`service-cmn`、`service-hosp`、`service-user`、`service-msm`、`service-oss`、`service-orders`、`service-task`、`service-statistics`。
 3. 启动 `service-gateway`，确认端口 8222 可用。
 4. 按需启动医院模拟端。
-5. 启动管理端和用户门户。
+5. 按需启动 AI 服务；正式预约依赖网关、用户、医院、订单、Redis、RabbitMQ 和医院模拟端均可用。
+6. 启动管理端和用户门户。
 
 各 Spring Boot 服务可在 IDE 中运行对应 `*Application.java`，也可进入模块后使用 `mvn spring-boot:run`。
 

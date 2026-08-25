@@ -20,6 +20,7 @@ CREATE TABLE `order_info` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
   `schedule_id` bigint DEFAULT NULL COMMENT '排班id',
   `patient_id` bigint DEFAULT NULL COMMENT '就诊人id',
+  `platform_order_no` varchar(30) DEFAULT NULL COMMENT '平台订单号，用于跨系统幂等',
   `number` int DEFAULT NULL COMMENT '预约号序',
   `fetch_time` varchar(50) DEFAULT NULL COMMENT '建议取号时间',
   `fetch_address` varchar(255) DEFAULT NULL COMMENT '取号地点',
@@ -30,7 +31,8 @@ CREATE TABLE `order_info` (
   `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `is_deleted` tinyint NOT NULL DEFAULT '0' COMMENT '逻辑删除(1:已删除，0:未删除)',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_platform_order_no` (`platform_order_no`)
 ) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb3 COMMENT='订单表';
 
 DROP TABLE IF EXISTS `schedule`;

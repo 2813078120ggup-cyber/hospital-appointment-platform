@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 @Schema(description = "医院管理数据API接口")
 @RestController
@@ -62,6 +63,42 @@ public class ApiController {
             return Result.fail(false).message("暂无可预约号源");
         } catch (IllegalArgumentException exception) {
             return Result.fail(false).message(exception.getMessage());
+        }
+    }
+
+    @Operation(description = "为已登录用户解析可预约的具体排班")
+    @PostMapping("auth/selectSchedule")
+    public R selectAvailableSchedule(HttpServletRequest request) {
+        Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());
+        String name = (String) paramMap.get("name");
+        String doctorName = (String) paramMap.get("doctorName");
+        String date = (String) paramMap.get("date");
+        String time = (String) paramMap.get("time");
+        if (!StringUtils.hasText(name) || !StringUtils.hasText(date) || !StringUtils.hasText(time)) {
+            throw new YyghException(20001, "科室名称、日期和时间不能为空");
+        }
+
+        try {
+            Schedule schedule = scheduleService.findAvailableSchedule(name, date, time, doctorName);
+            if (schedule == null) {
+                throw new YyghException(20001, "暂无可预约号源");
+            }
+            // 功能完善：仅返回正式下单所需的最小排班数据，不直接暴露 MongoDB 完整文档。
+            Map<String, Object> scheduleData = new LinkedHashMap<>();
+            scheduleData.put("scheduleId", schedule.getId());
+            scheduleData.put("hoscode", schedule.getHoscode());
+            scheduleData.put("depcode", schedule.getDepcode());
+            scheduleData.put("hospitalName", schedule.getParam().get("hosname"));
+            scheduleData.put("departmentName", schedule.getParam().get("depname"));
+            scheduleData.put("doctorName", schedule.getDocname());
+            scheduleData.put("title", schedule.getTitle());
+            scheduleData.put("workDate", schedule.getWorkDate());
+            scheduleData.put("workTime", schedule.getWorkTime());
+            scheduleData.put("amount", schedule.getAmount());
+            scheduleData.put("availableNumber", schedule.getAvailableNumber());
+            return R.ok().data("schedule", scheduleData);
+        } catch (IllegalArgumentException exception) {
+            throw new YyghException(20001, exception.getMessage());
         }
     }
 

@@ -40,4 +40,7 @@ public interface ScheduleService {
 
     //根据科室名称、日期、时间和可选医生查询是否有可预约号源
     boolean hasAvailableSchedule(String departmentName, String date, String time, String doctorName);
+
+    // 功能完善：AI 正式下单前解析出具体排班主键，避免仅凭布尔结果创建模糊订单。
+    Schedule findAvailableSchedule(String departmentName, String date, String time, String doctorName);
 }

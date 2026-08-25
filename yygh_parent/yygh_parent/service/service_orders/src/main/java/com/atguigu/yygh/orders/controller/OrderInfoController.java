@@ -36,8 +36,21 @@ public class OrderInfoController {
     @PostMapping("auth/submitOrder/{scheduleId}/{patientId}")
     public R submitOrder(@PathVariable("scheduleId") String scheduleId,
                          @PathVariable("patientId") Long patientId,
+                         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                          HttpServletRequest request) {
-        Long orderId = orderInfoService.createOrder(scheduleId, patientId, requireUserId(request));
+        // 功能完善：AI、前端重试可携带稳定幂等键，订单服务据此返回同一订单而不重复扣号。
+        Long orderId = orderInfoService.createOrder(
+                scheduleId, patientId, requireUserId(request), idempotencyKey);
+        return R.ok().data("orderId", orderId);
+    }
+
+    @GetMapping("auth/findByIdempotencyKey")
+    public R findByIdempotencyKey(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            HttpServletRequest request) {
+        // 功能完善：仅查询既有订单，不触发扣号，用于 AI 在响应丢失后安全恢复取消流程。
+        Long orderId = orderInfoService.findOrderIdByIdempotencyKey(
+                requireUserId(request), idempotencyKey);
         return R.ok().data("orderId", orderId);
     }
 

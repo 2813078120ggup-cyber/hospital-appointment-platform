@@ -9,6 +9,7 @@ import com.atguigu.hospital.model.Schedule;
 import com.atguigu.hospital.service.HospitalService;
 import com.atguigu.hospital.util.ResultCodeEnum;
 import com.atguigu.hospital.util.YyghException;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,10 @@ public class HospitalServiceImpl implements HospitalService {
         String reserveDate = (String) paramMap.get("reserveDate");
         String reserveTime = (String) paramMap.get("reserveTime");
         String amount = (String) paramMap.get("amount");
+        String platformOrderNo = (String) paramMap.get("platformOrderNo");
+        if (platformOrderNo == null || platformOrderNo.isBlank() || platformOrderNo.length() > 30) {
+            throw new YyghException(ResultCodeEnum.DATA_ERROR);
+        }
 
         Schedule schedule = hospitalMapper.selectByIdForUpdate(Long.valueOf(hosScheduleId));
         if (null == schedule) {
@@ -51,6 +56,17 @@ public class HospitalServiceImpl implements HospitalService {
                 || !Integer.valueOf(1).equals(schedule.getStatus())
                 || new BigDecimal(schedule.getAmount()).compareTo(new BigDecimal(amount)) != 0) {
             throw new YyghException(ResultCodeEnum.DATA_ERROR);
+        }
+
+        // 功能完善：排班行锁内复查平台订单号。响应丢失后的重试直接返回原医院订单，不重复扣号。
+        LambdaQueryWrapper<OrderInfo> orderQuery = new LambdaQueryWrapper<>();
+        orderQuery.eq(OrderInfo::getPlatformOrderNo, platformOrderNo);
+        OrderInfo existingOrder = orderInfoMapper.selectOne(orderQuery);
+        if (existingOrder != null) {
+            if (!schedule.getId().equals(existingOrder.getScheduleId())) {
+                throw new YyghException(ResultCodeEnum.DATA_ERROR);
+            }
+            return buildOrderResult(existingOrder, schedule);
         }
 
         //就诊人信息
@@ -69,6 +85,7 @@ public class HospitalServiceImpl implements HospitalService {
             OrderInfo orderInfo = new OrderInfo();
             orderInfo.setPatientId(patientId);
             orderInfo.setScheduleId(schedule.getId());
+            orderInfo.setPlatformOrderNo(platformOrderNo);
             int number = schedule.getReservedNumber().intValue() - schedule.getAvailableNumber().intValue();
             orderInfo.setNumber(number); // 挂号序号
             orderInfo.setAmount(new BigDecimal(amount));
@@ -79,25 +96,23 @@ public class HospitalServiceImpl implements HospitalService {
             orderInfo.setOrderStatus(0); // 0下单未支付  1已支付  2取号  -1取消（OrderStatusEnum）
             orderInfoMapper.insert(orderInfo);
 
-            resultMap.put("resultCode", "0000");
-            resultMap.put("resultMsg", "预约成功");
-            //预约记录唯一标识（医院预约记录主键）
-            resultMap.put("hosRecordId", orderInfo.getId());
-            //预约号序
-            resultMap.put("number", number);
-            //取号时间
-            resultMap.put("fetchTime", fetchTime);
-
-            //取号地址
-            resultMap.put("fetchAddress", "一层114窗口");
-
-            //排班可预约数
-            resultMap.put("reservedNumber", schedule.getReservedNumber());
-            //排班剩余预约数
-            resultMap.put("availableNumber", schedule.getAvailableNumber());
+            resultMap.putAll(buildOrderResult(orderInfo, schedule));
         } else {
             throw new YyghException(ResultCodeEnum.DATA_ERROR);
         }
+        return resultMap;
+    }
+
+    private Map<String, Object> buildOrderResult(OrderInfo orderInfo, Schedule schedule) {
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("resultCode", "0000");
+        resultMap.put("resultMsg", "预约成功");
+        resultMap.put("hosRecordId", orderInfo.getId());
+        resultMap.put("number", orderInfo.getNumber());
+        resultMap.put("fetchTime", orderInfo.getFetchTime());
+        resultMap.put("fetchAddress", orderInfo.getFetchAddress());
+        resultMap.put("reservedNumber", schedule.getReservedNumber());
+        resultMap.put("availableNumber", schedule.getAvailableNumber());
         return resultMap;
     }
 

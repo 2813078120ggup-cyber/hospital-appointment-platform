@@ -89,6 +89,7 @@
 | `id` | `bigint` | 否 | `—` | AUTO_INCREMENT | 编号 |
 | `schedule_id` | `bigint` | 是 | `—` | — | 排班id |
 | `patient_id` | `bigint` | 是 | `—` | — | 就诊人id |
+| `platform_order_no` | `varchar(30)` | 是 | `—` | — | 平台订单号，用于跨系统幂等 |
 | `number` | `int` | 是 | `—` | — | 预约号序 |
 | `fetch_time` | `varchar(50)` | 是 | `—` | — | 建议取号时间 |
 | `fetch_address` | `varchar(255)` | 是 | `—` | — | 取号地点 |
@@ -103,6 +104,7 @@
 索引与约束：
 
 - `PRIMARY KEY (`id`)`
+- `UNIQUE KEY `uk_platform_order_no` (`platform_order_no`)`
 
 ### `schedule` — 医生日程安排表
 
