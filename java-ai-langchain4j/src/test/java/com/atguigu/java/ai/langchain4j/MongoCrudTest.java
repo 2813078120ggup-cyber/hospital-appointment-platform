@@ -2,6 +2,7 @@ package com.atguigu.java.ai.langchain4j;
 
 import com.atguigu.java.ai.langchain4j.bean.ChatMessages;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -9,6 +10,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+// 功能完善：MongoDB 增删改查演示会改变本地数据，仅在显式集成测试中运行。
+@EnabledIfEnvironmentVariable(named = "XIAOZHI_RUN_INTEGRATION_TESTS", matches = "(?i)true")
 @SpringBootTest
 public class MongoCrudTest {
     

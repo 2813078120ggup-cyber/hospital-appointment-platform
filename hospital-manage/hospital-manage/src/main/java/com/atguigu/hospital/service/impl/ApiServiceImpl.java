@@ -62,7 +62,8 @@ public class ApiServiceImpl implements ApiService {
     @Override
     public JSONObject getHospital() {
         Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put("hoscode", "10000");
+        // 功能完善：医院编号来自本地医院设置，禁止写死为示例编号导致签名与资源错配。
+        paramMap.put("hoscode", this.getHoscode());
         paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
         paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
         JSONObject respone =
@@ -82,7 +83,8 @@ public class ApiServiceImpl implements ApiService {
         JSONObject jsonObject = JSONObject.parseObject(data);
 
         Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put("hoscode", "10000");
+        // 功能完善：上传医院资料时使用当前配置编号，支持真实的多医院接入配置。
+        paramMap.put("hoscode", this.getHoscode());
         paramMap.put("hosname", jsonObject.getString("hosname"));
         paramMap.put("hostype", jsonObject.getString("hostype"));
         paramMap.put("provinceCode", jsonObject.getString("provinceCode"));
@@ -273,7 +275,8 @@ public class ApiServiceImpl implements ApiService {
                 throw new YyghException(respone.getString("message"), 201);
             }
         }
-        return false;
+        // 功能完善：所有排班均已成功写入本地并同步平台后，应返回真实成功状态。
+        return true;
     }
 
     @Override

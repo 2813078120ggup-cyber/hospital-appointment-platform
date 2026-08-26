@@ -1,5 +1,6 @@
 package com.atguigu.yygh.user.service.impl;
 
+import com.atguigu.yygh.common.constant.SmsCodeConstants;
 import com.atguigu.yygh.common.exception.YyghException;
 import com.atguigu.yygh.common.utils.JwtHelper;
 import com.atguigu.yygh.enums.AuthStatusEnum;
@@ -17,10 +18,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,11 @@ import java.util.Map;
  */
 @Service
 public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> implements UserInfoService {
+
+    private static final DefaultRedisScript<Long> VERIFY_AND_DELETE_CODE_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+                    + "return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class);
 
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
@@ -41,18 +50,25 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     @Override
     public Map<String, Object> loginUser(LoginVo loginVo) {
         //1 获取手机号和验证码
-        String phone = loginVo.getPhone();
-        String code = loginVo.getCode();
+        String phone = loginVo == null ? null : loginVo.getPhone();
+        String code = loginVo == null ? null : loginVo.getCode();
 
         //2 手机号和验证码非空判断
         if (StringUtils.isEmpty(phone) || StringUtils.isEmpty(code)) {
             throw new YyghException(20001, "数据为空");
         }
 
-        //3 验证码校验过程
-        // 输入验证码 和 redis存储验证码比对
-        String redisCode = "6666";//redisTemplate.opsForValue().get(phone);
-        if (!code.equals(redisCode)) {
+        //3 功能完善：在 Redis 内原子比对并删除验证码，保证验证码一次性使用且并发登录只能成功一次。
+        Long verified;
+        try {
+            verified = redisTemplate.execute(
+                    VERIFY_AND_DELETE_CODE_SCRIPT,
+                    Collections.singletonList(SmsCodeConstants.loginCodeKey(phone)),
+                    code);
+        } catch (DataAccessException exception) {
+            throw new YyghException(20001, "验证码服务暂不可用，请稍后重试");
+        }
+        if (!Long.valueOf(1L).equals(verified)) {
             throw new YyghException(20001, "验证码校验失败");
         }
 

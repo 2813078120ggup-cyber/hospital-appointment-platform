@@ -3,9 +3,12 @@ package com.atguigu.java.ai.langchain4j;
 import com.atguigu.java.ai.langchain4j.assistant.MemoryChatAssistant;
 import com.atguigu.java.ai.langchain4j.assistant.SeparateChatAssistant;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+// 功能完善：提示词演示依赖真实模型，默认单元测试不发起模型请求。
+@EnabledIfEnvironmentVariable(named = "XIAOZHI_RUN_INTEGRATION_TESTS", matches = "(?i)true")
 @SpringBootTest
 public class PromptTest {
     @Autowired

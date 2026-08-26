@@ -29,6 +29,12 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `YYGH_GATEWAY_URL` | AI 正式预约 | AI 转发用户登录令牌并创建正式订单，默认 `http://localhost:8222` |
 | `XIAOZHI_DATASOURCE_URL` / `XIAOZHI_DB_USERNAME` / `XIAOZHI_DB_PASSWORD` | AI 服务 | AI 预约关联库，默认连接本机 `guiguxiaozhi` |
 | `XIAOZHI_MONGODB_URI` | AI 服务 | AI 对话记忆 MongoDB URI，默认 `mongodb://localhost:27017/chat_memory_db` |
+| `LANGCHAIN4J_OPENAI_BASE_URL` | AI 模型 | OpenAI 兼容接口，默认 `http://localhost:11434/v1` |
+| `LANGCHAIN4J_OPENAI_API_KEY` | AI 模型 | OpenAI 兼容接口密钥；本地 Ollama 默认使用占位值 `ollama-local`，远程环境必须注入真实密钥 |
+| `LANGCHAIN4J_OPENAI_MODEL` | AI 模型 | 模型名称，默认 `qwen3:0.6b` |
+| `OLLAMA_BASE_URL` | AI 模型 | Ollama 原生接口地址，默认 `http://localhost:11434` |
+| `LANGCHAIN4J_LOG_REQUESTS` / `LANGCHAIN4J_LOG_RESPONSES` | AI 排障 | 是否记录模型请求和响应，默认 `false`；生产环境慎用，避免记录用户输入 |
+| `XIAOZHI_RUN_INTEGRATION_TESTS` | AI 测试 | 设为 `true` 才运行会访问模型、MySQL 或 MongoDB 的演示集成测试，默认不启用 |
 
 ## 第三方能力
 
@@ -45,6 +51,8 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `WECHAT_PAY_NOTIFY_URL` | `service-orders` | 微信支付回调地址；部署时必须是微信可访问的 HTTPS 地址 |
 | `ALIYUN_SMS_APPCODE` | `service-msm` | 阿里云市场短信凭据，无默认值 |
 | `ALIYUN_SMS_HOST` / `ALIYUN_SMS_PATH` / `ALIYUN_SMS_TEMPLATE_ID` | `service-msm` | 短信供应商地址、路径和模板 |
+
+短信登录验证码使用 Redis 键前缀 `sms:login:code:`，有效期 5 分钟；发送冷却键前缀为 `sms:login:cooldown:`，有效期 60 秒。验证码只在供应商发送成功后保存，登录时通过 Redis Lua 原子比较并删除，因此同一验证码只能成功使用一次。Redis 异常时登录按失败关闭处理。
 
 ## 前端配置
 

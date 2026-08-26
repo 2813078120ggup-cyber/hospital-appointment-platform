@@ -19,3 +19,7 @@ python tools\generate_reference_docs.py --sql-source "D:\XZYL\代码\01-数据�
 ```
 
 详细字段说明见 [数据库字典](../docs/database-dictionary.md)。
+
+## 条件迁移
+
+基础表创建后执行 `migrations/20260825_add_ai_formal_order_support.sql`。该脚本会按 `information_schema` 判断字段和索引是否已经存在，可重复执行；它为医院模拟端订单增加跨系统幂等号，为 AI 预约增加平台关联字段，并通过 `uk_appointment_identity_slot` 防止同一证件、科室、日期和时段产生重复预约记录。

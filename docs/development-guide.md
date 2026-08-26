@@ -50,6 +50,8 @@ $env:YYGH_HOSPITAL_BOOTSTRAP_TOKEN = '<平台与医院模拟端共享的随机�
 
 基础设施默认连接 `localhost`。如果服务运行在其他主机，继续按 [配置说明](configuration.md) 覆盖 Nacos、Redis、MongoDB、RabbitMQ 和各数据库 URL。第三方能力不用时可保持相应凭据为空，但调用该能力会明确失败。
 
+Windows 若因系统保留端口导致 RabbitMQ 无法绑定 5672，可映射到其他本机端口，并在启动业务服务前设置例如 `$env:YYGH_RABBITMQ_PORT = '25672'`；不要为此删除已有 RabbitMQ 数据卷。
+
 ## 4. 构建后端
 
 ```powershell
@@ -58,6 +60,19 @@ mvn -DskipTests package
 
 Set-Location ..\..\hospital-manage\hospital-manage
 mvn -DskipTests package
+
+Set-Location ..\..\java-ai-langchain4j
+mvn clean test
+mvn -DskipTests package
+```
+
+AI 模块的 Maven 编译必须保留 Java 参数名，LangChain4j 才能把模型生成的工具 JSON 绑定到挂号方法；不要移除 `maven-compiler-plugin` 的 `parameters` 配置。生成的 AI 与网关 JAR 均可直接通过 `java -jar` 启动。
+
+AI 默认测试只运行无外部副作用的单元测试。原有模型、图片、MongoDB 和 MySQL 演示测试会访问真实服务或修改数据，需在准备好隔离数据和相应凭据后显式启用：
+
+```powershell
+$env:XIAOZHI_RUN_INTEGRATION_TESTS = 'true'
+mvn test
 ```
 
 ## 5. 启动顺序
@@ -70,6 +85,15 @@ mvn -DskipTests package
 6. 启动管理端和用户门户。
 
 各 Spring Boot 服务可在 IDE 中运行对应 `*Application.java`，也可进入模块后使用 `mvn spring-boot:run`。
+
+本地 AI 默认连接 Ollama。首次运行需准备模型：
+
+```powershell
+ollama pull qwen3:0.6b
+ollama serve
+```
+
+使用远程 OpenAI 兼容服务时，应通过 `LANGCHAIN4J_OPENAI_BASE_URL`、`LANGCHAIN4J_OPENAI_API_KEY` 和 `LANGCHAIN4J_OPENAI_MODEL` 覆盖默认值，禁止把密钥提交到配置文件。
 
 ## 6. 启动前端
 

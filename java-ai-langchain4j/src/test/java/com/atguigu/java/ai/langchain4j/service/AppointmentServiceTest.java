@@ -2,9 +2,12 @@ package com.atguigu.java.ai.langchain4j.service;
 
 import com.atguigu.java.ai.langchain4j.entity.Appointment;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+// 功能完善：该类直接读写本地预约表，只有显式联调时才允许执行。
+@EnabledIfEnvironmentVariable(named = "XIAOZHI_RUN_INTEGRATION_TESTS", matches = "(?i)true")
 @SpringBootTest
 class AppointmentServiceTest {
 

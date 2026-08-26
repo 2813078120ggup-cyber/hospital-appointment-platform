@@ -66,3 +66,15 @@ SET @ddl = IF(
 PREPARE migration_stmt FROM @ddl;
 EXECUTE migration_stmt;
 DEALLOCATE PREPARE migration_stmt;
+
+-- 功能完善：存量 AI 预约表也必须补齐唯一约束，避免并发请求绕过应用层查询后重复落库。
+SET @ddl = IF(
+    EXISTS(SELECT 1 FROM information_schema.STATISTICS
+           WHERE TABLE_SCHEMA = 'guiguxiaozhi' AND TABLE_NAME = 'appointment'
+             AND INDEX_NAME = 'uk_appointment_identity_slot'),
+    'SELECT 1',
+    'ALTER TABLE `guiguxiaozhi`.`appointment` ADD UNIQUE KEY `uk_appointment_identity_slot` (`id_card`, `department`, `date`, `time`)'
+);
+PREPARE migration_stmt FROM @ddl;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;

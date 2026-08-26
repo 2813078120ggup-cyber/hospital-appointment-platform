@@ -56,7 +56,17 @@ public class AppointmentTools {
     }
 
     @Tool(name = "预约挂号", value = "根据参数查询号源。用户确认预约信息后，使用当前登录账号下匹配的就诊人创建平台正式订单。")
-    public String bookAppointment(@ToolMemoryId Long memoryId, Appointment appointment) {
+    public String bookAppointment(
+            @ToolMemoryId Long memoryId,
+            @P(value = "就诊人姓名") String username,
+            @P(value = "身份证号") String idCard,
+            @P(value = "科室名称") String department,
+            @P(value = "日期") String date,
+            @P(value = "时间，可选值：上午、下午") String time,
+            @P(value = "医生名称", required = false) String doctorName) {
+        // 功能完善：只接收业务白名单字段，禁止模型直接指定本地记录 ID、患者 ID 或平台订单 ID。
+        Appointment appointment = appointmentFromArguments(
+                username, idCard, department, date, time, doctorName);
         String validationMessage = validateAppointment(appointment);
         if (validationMessage != null) {
             return validationMessage;
@@ -138,7 +148,16 @@ public class AppointmentTools {
     }
 
     @Tool(name = "取消预约挂号", value = "取消当前登录用户的对应平台正式订单；只有平台取消成功后才删除 AI 本地预约记录。")
-    public String cancelAppointment(@ToolMemoryId Long memoryId, Appointment appointment) {
+    public String cancelAppointment(
+            @ToolMemoryId Long memoryId,
+            @P(value = "就诊人姓名") String username,
+            @P(value = "身份证号") String idCard,
+            @P(value = "科室名称") String department,
+            @P(value = "日期") String date,
+            @P(value = "时间，可选值：上午、下午") String time,
+            @P(value = "医生名称", required = false) String doctorName) {
+        Appointment appointment = appointmentFromArguments(
+                username, idCard, department, date, time, doctorName);
         String validationMessage = validateAppointment(appointment);
         if (validationMessage != null) {
             return validationMessage;
@@ -181,19 +200,25 @@ public class AppointmentTools {
 
     @Tool(name = "查询是否有号源", value = "根据科室名称、日期、时间和可选医生查询是否有号源")
     public boolean querySchedule(
-            @P(value = "科室名称") String name,
+            // 功能完善：参数名与预约领域字段统一为 department，并由 Maven 的 -parameters 配置保留到运行时。
+            @P(value = "科室名称") String department,
             @P(value = "日期") String date,
             @P(value = "时间，可选值：上午、下午") String time,
             @P(value = "医生名称", required = false) String doctorName) {
-        if (!StringUtils.hasText(name) || !StringUtils.hasText(date) || !StringUtils.hasText(time)) {
+        log.debug("号源查询工具参数，department={}, date={}, time={}, doctorName={}",
+                department, date, time, doctorName);
+        if (!StringUtils.hasText(department) || !StringUtils.hasText(date) || !StringUtils.hasText(time)) {
             return false;
         }
 
         String url = serviceHospUrl + "/api/hosp/selectSchedule";
         try {
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    url, formRequest(null, name, date, time, doctorName), Map.class);
+                    url, formRequest(null, department, date, time, doctorName), Map.class);
             Map<String, Object> result = response.getBody();
+            // 功能完善：仅在 DEBUG 级别记录非患者号源查询结果，便于区分远程响应异常和模型参数绑定异常。
+            log.debug("号源查询完成，department={}, date={}, time={}, doctorName={}, result={}",
+                    department, date, time, doctorName, result);
             return result != null && codeEquals(result.get("code"), 200)
                     && Boolean.TRUE.equals(result.get("data"));
         } catch (RuntimeException exception) {
@@ -387,6 +412,22 @@ public class AppointmentTools {
             return "预约信息不完整，请补充姓名、身份证号、科室、日期和时间";
         }
         return null;
+    }
+
+    private Appointment appointmentFromArguments(String username,
+                                                 String idCard,
+                                                 String department,
+                                                 String date,
+                                                 String time,
+                                                 String doctorName) {
+        Appointment appointment = new Appointment();
+        appointment.setUsername(username);
+        appointment.setIdCard(idCard);
+        appointment.setDepartment(department);
+        appointment.setDate(date);
+        appointment.setTime(time);
+        appointment.setDoctorName(doctorName);
+        return appointment;
     }
 
     private boolean codeEquals(Object value, int expected) {
