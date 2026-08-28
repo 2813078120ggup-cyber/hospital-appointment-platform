@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
 
 import java.util.Map;
 
@@ -28,6 +29,12 @@ public class UserController {
         return R.ok();
     }
 
+    @PutMapping("updateStatus/{userId}/{status}")
+    public R updateStatus(@PathVariable Long userId, @PathVariable Integer status) {
+        userInfoService.updateStatus(userId, status);
+        return R.ok();
+    }
+
     //用户详情接口
     @GetMapping("show/{userId}")
     public R showUserInfo(@PathVariable Long userId) {
@@ -41,7 +48,9 @@ public class UserController {
                   @PathVariable Long limit,
                   UserInfoQueryVo userInfoQueryVo) {
         //创建page对象，传递当前页和每页记录数
-        Page<UserInfo> pageParam = new Page<>(page, limit);
+        long current = page == null || page < 1 ? 1 : page;
+        long size = limit == null || limit < 1 ? 10 : Math.min(limit, 100);
+        Page<UserInfo> pageParam = new Page<>(current, size);
         //调用service方法
         IPage<UserInfo> pageModel =
                 userInfoService.selectPage(pageParam, userInfoQueryVo);

@@ -4,16 +4,16 @@
     <!--左侧导航 #start -->
     <div class="nav left-nav">
       <div class="nav-item ">
-        <span class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/'+hospital.hoscode+'\''">预约挂号 </span>
+        <span class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/'+hoscode+'\''">预约挂号 </span>
       </div>
       <div class="nav-item selected">
-        <span class="v-link selected dark" :onclick="'javascript:window.location=\'/hospital/detail/'+hospital.hoscode+'\''"> 医院详情 </span>
+        <span class="v-link selected dark" :onclick="'javascript:window.location=\'/hospital/detail/'+hoscode+'\''"> 医院详情 </span>
       </div>
       <div class="nav-item">
-        <span class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/notice/'+hospital.hoscode+'\''"> 预约须知 </span>
+        <span class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/notice/'+hoscode+'\''"> 预约须知 </span>
       </div>
       <div class="nav-item "><span
-        class="v-link clickable dark"> 停诊信息 </span>
+        class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/suspend/'+hoscode+'\''"> 停诊信息 </span>
       </div>
       <div class="nav-item "><span
         class="v-link clickable dark"> 查询/取消 </span>
@@ -30,13 +30,13 @@
         </div>
         <div class="info-wrapper"><img :src="'data:image/jpeg;base64,'+hospital.logoData" :alt="hospital.hosname" style="width: 80px; height: 80px;">
           <div class="content-wrapper">
-            <div></div>
-            <div></div>
-            <div></div>
-            <div>
-              <div class="icon-text-wrapper"><span class="iconfont prefix-icon"></span>
-                <span class="text"><p>{{ hospital.route }}</p>
-              </span><span class="iconfont right-icon"></span></div>
+            <div class="icon-text-wrapper" v-if="hospital.param.fullAddress">
+              <span class="iconfont prefix-icon"></span>
+              <span class="text">地址：{{ hospital.param.fullAddress }}</span>
+            </div>
+            <div class="icon-text-wrapper" v-if="hospital.route">
+              <span class="iconfont prefix-icon"></span>
+              <span class="text">路线：{{ hospital.route }}</span>
             </div>
           </div>
         </div>
@@ -68,7 +68,10 @@ export default {
   methods: {
     init() {
       hospitalApi.show(this.hoscode).then(response => {
-        this.hospital = response.data.hospital
+        this.hospital = {
+          ...response.data.hospital,
+          param: response.data.hospital.param || {}
+        }
       })
     }
   }

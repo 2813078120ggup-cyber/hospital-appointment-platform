@@ -42,10 +42,14 @@
                 <el-upload
                         :multiple="false"
                         :on-success="onUploadSuccess"
-                        :action="'http://localhost:8202/admin/cmn/dict/importData'"
+                        :on-error="onUploadError"
+                        :before-upload="beforeUpload"
+                        :headers="uploadHeaders"
+                        :action="uploadAction"
+                        accept=".xls,.xlsx"
                         class="upload-demo">
                     <el-button size="small" type="primary">点击上传</el-button>
-                    <div slot="tip" class="el-upload__tip">只能上传xls文件，且不超过500kb</div>
+                    <div slot="tip" class="el-upload__tip">只能上传 xls/xlsx 文件，且不超过 500KB</div>
                 </el-upload>
             </el-form-item>
         </el-form>
@@ -58,11 +62,18 @@
 </template>
 <script>
 import dict from '@/api/yygh/dict'
+import { getToken } from '@/utils/auth'
 export default {
     data() {
         return {
             dialogImportVisible:false,//true弹出  false关闭
-            list:[] //数据字典列表数组
+            list:[], //数据字典列表数组
+            uploadAction: (process.env.VUE_APP_BASE_API || '').replace(/\/$/, '') + '/admin/cmn/dict/importData'
+        }
+    },
+    computed: {
+        uploadHeaders() {
+            return { token: getToken() }
         }
     },
     created() {
@@ -75,15 +86,45 @@ export default {
             this.dialogImportVisible = true
         },
         //上传成功调用放
-        onUploadSuccess(response, file) {
-            this.$message.info('上传成功')
+        onUploadSuccess(response) {
+            if (!response || response.code !== 20000) {
+                this.$message.error((response && response.message) || '导入失败')
+                return
+            }
+            this.$message.success('导入成功')
             //关闭弹框
             this.dialogImportVisible = false
             this.getDictList(1)
         },
+        onUploadError() {
+            this.$message.error('导入失败，请确认文件格式和字典服务状态')
+        },
+        beforeUpload(file) {
+            const isExcel = /\.(xls|xlsx)$/i.test(file.name)
+            const isWithinLimit = file.size / 1024 < 500
+            if (!isExcel) {
+                this.$message.error('请选择 xls 或 xlsx 文件')
+            }
+            if (!isWithinLimit) {
+                this.$message.error('文件大小不能超过 500KB')
+            }
+            return isExcel && isWithinLimit
+        },
         //导出
         exportData() {
-            window.open("http://localhost:8202/admin/cmn/dict/exportData")
+            dict.exportData().then(response => {
+                const blob = new Blob([response.data], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                })
+                const url = window.URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = '医院预约挂号平台数据字典.xlsx'
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                window.URL.revokeObjectURL(url)
+            })
         },
         //数据字典列表
         getDictList(id) {

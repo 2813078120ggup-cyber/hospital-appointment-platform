@@ -1,14 +1,76 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:include="common/meta :: meta">
-
-</head>
-<body style="position: relative;">
-<div>
-
+<head th:include="common/meta :: meta"></head>
+<body class="clinic-page">
+<div class="clinic-header">
+    <div>
+        <h1 th:text="${hospitalSet != null && hospitalSet.hoscode != null ? '医院 ' + hospitalSet.hoscode + ' 运营总览' : '医院运营总览'}">医院运营总览</h1>
+        <p class="clinic-subtitle">集中查看医生、排班、号源与预约状态，异常项会在这里优先提示。</p>
+    </div>
+    <a class="btn btn-outline-clinic" href="/hospital/index"><i class="fa fa-hospital-o"></i> 维护医院资料</a>
 </div>
-<div class="v-h-center">
-    <strong class="desc">欢迎登录医院接口模拟管理系统</strong>
+
+<div class="operations-bar">
+    <span class="title"><i class="fa fa-heartbeat"></i> 今日运营状态</span>
+    <span class="status-badge status-ok" th:if="${availableScheduleCount > 0}">可预约排班正常</span>
+    <span class="status-badge status-warn" th:if="${availableScheduleCount == 0}">暂无可预约排班</span>
+    <span class="status-badge status-stop" th:if="${suspendedScheduleCount > 0}" th:text="${suspendedScheduleCount + ' 个停诊排班'}">停诊排班</span>
+    <a class="btn btn-sm btn-clinic" href="/schedule/create"><i class="fa fa-plus"></i> 新增排班</a>
+    <a class="btn btn-sm btn-outline-clinic" href="/admin/doctor/form"><i class="fa fa-user-plus"></i> 新增医生</a>
+</div>
+
+<div class="metric-grid">
+    <div class="metric-card">
+        <span class="label">启用医生</span><div class="value" th:text="${doctorCount}">0</div>
+        <div class="hint">可使用姓名登录医生端</div>
+    </div>
+    <div class="metric-card success">
+        <span class="label">可预约排班</span><div class="value" th:text="${availableScheduleCount}">0</div>
+        <div class="hint" th:text="${'全部排班 ' + scheduleCount + ' 个'}">全部排班</div>
+    </div>
+    <div class="metric-card warning">
+        <span class="label">待支付预约</span><div class="value" th:text="${pendingOrderCount}">0</div>
+        <div class="hint" th:text="${'预约总数 ' + orderCount + ' 笔'}">预约总数</div>
+    </div>
+    <div class="metric-card danger">
+        <span class="label">停诊排班</span><div class="value" th:text="${suspendedScheduleCount}">0</div>
+        <div class="hint" th:text="${'已支付预约 ' + paidOrderCount + ' 笔'}">已支付预约</div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="clinic-card"><div class="ibox-content">
+            <div class="clinic-header">
+                <div><h2>近期排班</h2><p class="clinic-subtitle">最近维护的排班及剩余号源</p></div>
+                <a href="/schedule/list">查看全部 <i class="fa fa-angle-right"></i></a>
+            </div>
+            <div class="table-responsive" th:if="${recentSchedules != null && !recentSchedules.isEmpty()}">
+                <table class="table clinic-table">
+                    <thead><tr><th>日期</th><th>科室</th><th>医生</th><th>时段</th><th>剩余/总号源</th><th>状态</th></tr></thead>
+                    <tbody><tr th:each="item : ${recentSchedules}">
+                        <td th:text="${item.workDate}">2026-01-01</td>
+                        <td th:text="${item.depcode}">科室</td>
+                        <td><strong th:text="${item.docname}">医生</strong><br><small th:text="${item.title}">职称</small></td>
+                        <td th:text="${item.workTime == 0 ? '上午' : '下午'}">上午</td>
+                        <td th:text="${item.availableNumber + ' / ' + item.reservedNumber}">0 / 0</td>
+                        <td><span class="status-badge" th:classappend="${item.status == 1 ? ' status-ok' : (item.status == -1 ? ' status-stop' : ' status-warn')}" th:text="${item.status == 1 ? '可预约' : (item.status == -1 ? '停诊' : '停约')}">状态</span></td>
+                    </tr></tbody>
+                </table>
+            </div>
+            <div class="clinic-empty" th:if="${recentSchedules == null || recentSchedules.isEmpty()}"><i class="fa fa-calendar-o"></i>暂无排班，请先创建医生与排班。</div>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="clinic-card"><div class="ibox-content">
+            <div class="clinic-header"><div><h2>运营快捷入口</h2><p class="clinic-subtitle">按日常工作顺序完成资源维护</p></div></div>
+            <p><a class="btn btn-outline-clinic btn-block text-left" href="/department/list"><i class="fa fa-sitemap"></i>&nbsp; 维护科室</a></p>
+            <p><a class="btn btn-outline-clinic btn-block text-left" href="/admin/doctor/list"><i class="fa fa-user-md"></i>&nbsp; 管理医生账号</a></p>
+            <p><a class="btn btn-outline-clinic btn-block text-left" href="/schedule/list"><i class="fa fa-calendar"></i>&nbsp; 管理排班号源</a></p>
+            <p><a class="btn btn-outline-clinic btn-block text-left" href="/admin/order/list"><i class="fa fa-list-alt"></i>&nbsp; 查看预约记录</a></p>
+            <p><a class="btn btn-outline-clinic btn-block text-left" href="/feedback/list"><i class="fa fa-comments"></i>&nbsp; 处理意见反馈</a></p>
+        </div></div>
+    </div>
 </div>
 </body>
 </html>

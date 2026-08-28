@@ -11,22 +11,23 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 | `YYGH_CMN_DATASOURCE_URL` | 按环境 | `yygh_cmn` JDBC URL |
 | `YYGH_HOSP_DATASOURCE_URL` | 按环境 | `yygh_hosp` JDBC URL |
 | `YYGH_MANAGE_DATASOURCE_URL` | 按环境 | `yygh_manage` JDBC URL |
-| `YYGH_MANAGE_TEST_DATASOURCE_URL` | 测试环境 | 医院模拟端 test profile JDBC URL，默认 localhost |
+| `YYGH_MANAGE_TEST_DATASOURCE_URL` | 测试环境 | 医院模拟端 test profile JDBC URL，默认连接 `192.168.6.101` |
 | `YYGH_ORDER_DATASOURCE_URL` | 按环境 | `yygh_order` JDBC URL |
 | `YYGH_USER_DATASOURCE_URL` | 按环境 | `yygh_user` JDBC URL |
-| `YYGH_NACOS_SERVER_ADDR` | 必需 | Nacos 地址，默认 `localhost:8848` |
-| `YYGH_MONGODB_URI` | 必需 | MongoDB URI，默认 `mongodb://localhost:27017/test` |
-| `YYGH_REDIS_HOST` / `YYGH_REDIS_PORT` | 必需 | Redis 地址，默认 `localhost:6379` |
-| `YYGH_RABBITMQ_HOST` / `YYGH_RABBITMQ_PORT` | 必需 | RabbitMQ 地址，默认 `localhost:5672` |
+| `YYGH_NACOS_SERVER_ADDR` | 必需 | Nacos 地址，默认 `192.168.6.101:8848` |
+| `YYGH_NACOS_DISCOVERY_IP` | 多网卡主机 | 注册到 Nacos 的当前服务 IPv4 地址，默认 `192.168.6.1`（Windows VMware VMnet8）；部署到其他主机时必须覆盖 |
+| `YYGH_MONGODB_URI` | 必需 | MongoDB URI，默认 `mongodb://192.168.6.101:27017/test` |
+| `YYGH_REDIS_HOST` / `YYGH_REDIS_PORT` | 必需 | Redis 地址，默认 `192.168.6.101:6379` |
+| `YYGH_RABBITMQ_HOST` / `YYGH_RABBITMQ_PORT` | 必需 | RabbitMQ 地址，默认 `192.168.6.101:5672` |
 | `YYGH_RABBITMQ_USERNAME` / `YYGH_RABBITMQ_PASSWORD` | 必需 | RabbitMQ 凭据，开发默认 `guest/guest` |
-| `YYGH_SENTINEL_DASHBOARD` | 可选 | Sentinel Dashboard，默认 `localhost:8058` |
+| `YYGH_SENTINEL_DASHBOARD` | 可选 | Sentinel Dashboard，默认 `192.168.6.101:8058` |
 | `YYGH_JWT_SECRET` | 必需 | JWT HMAC 密钥，至少 32 个 UTF-8 字节；未设置时网关拒绝启动 |
-| `YYGH_ADMIN_USERNAME` / `YYGH_ADMIN_PASSWORD` | 必需 | 管理端账号；用户名默认 `admin`，密码无默认值 |
+| `YYGH_ADMIN_USERNAME` / `YYGH_ADMIN_PASSWORD` | 生产必需 | 管理端账号；本地演示默认 `admin/123456`，生产环境必须覆盖为强密码 |
 | `YYGH_HOSPITAL_BOOTSTRAP_TOKEN` | 必需 | 平台首次向医院模拟端同步签名密钥的独立引导令牌 |
 | `YYGH_HOSPITAL_MANAGE_URL` | 本地联调 | 医院模拟端地址，默认 `http://localhost:9998` |
-| `YYGH_PLATFORM_API_URL` | 本地联调 | 医院模拟端调用平台的地址，默认 `http://localhost:8201` |
-| `YYGH_SERVICE_HOSP_URL` | AI 查号 | AI 调用公开查号接口，默认 `http://localhost:8201` |
-| `YYGH_GATEWAY_URL` | AI 正式预约 | AI 转发用户登录令牌并创建正式订单，默认 `http://localhost:8222` |
+| `YYGH_PLATFORM_API_URL` | 联调配置 | 医院模拟端调用平台的地址，默认 `http://192.168.6.101:8201` |
+| `YYGH_SERVICE_HOSP_URL` | AI 查号 | AI 调用公开查号接口，默认 `http://192.168.6.101:8201` |
+| `YYGH_GATEWAY_URL` | AI 正式预约 | AI 转发用户登录令牌并创建正式订单，默认 `http://192.168.6.101:8222` |
 | `XIAOZHI_DATASOURCE_URL` / `XIAOZHI_DB_USERNAME` / `XIAOZHI_DB_PASSWORD` | AI 服务 | AI 预约关联库，默认连接本机 `guiguxiaozhi` |
 | `XIAOZHI_MONGODB_URI` | AI 服务 | AI 对话记忆 MongoDB URI，默认 `mongodb://localhost:27017/chat_memory_db` |
 | `LANGCHAIN4J_OPENAI_BASE_URL` | AI 模型 | OpenAI 兼容接口，默认 `http://localhost:11434/v1` |
@@ -60,6 +61,12 @@ Spring 配置为本地基础设施保留了开发默认地址，凭据和第三�
 - 用户门户使用 `NUXT_ENV_API_BASE_URL`，默认 `http://localhost:8222`。
 - 部署时应把浏览器请求地址改为 HTTPS 公网网关，并同步配置 CORS、OAuth 回调和反向代理。
 - 调用 AI `/xiaozhi/chat` 时，登录用户应使用 `token` 或 `X-Token` 请求头传递现有 JWT。令牌只在当前请求线程中转发给网关，不写入提示词、聊天记忆或预约表。
+
+## 订单补偿与对账
+
+- 首次部署订单服务前，在远程 `yygh_order` 数据库执行 `database/migrations/20260827_add_order_compensation_outbox.sql`，创建持久化 outbox 表。
+- 订单服务每 10 秒领取到期任务，使用租约避免多实例重复执行；失败按 5 秒起步、最多 300 秒退避，达到 `YYGH_COMPENSATION_MAX_ATTEMPTS`（默认 8）后进入状态为 3 的数据库死信队列。
+- `YYGH_COMPENSATION_RECONCILE_LOOKBACK_HOURS`（默认 24）控制支付回调和取消订单对账窗口。管理员可从管理端“订单管理 → 补偿任务”查看任务和重新投递死信。
 
 ## 凭据轮换
 

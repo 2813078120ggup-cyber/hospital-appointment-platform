@@ -1,4 +1,7 @@
 module.exports = {
+  env: {
+    XIAOZHI_API_BASE_URL: process.env.XIAOZHI_API_BASE_URL || 'http://localhost:8080'
+  },
   /*
   ** Headers of the page
   */

@@ -29,6 +29,9 @@ public class OrderQueryVo {
 	//@ApiModelProperty(value = "订单状态")
 	private String orderStatus;
 
+	//@ApiModelProperty(value = "取消处理状态")
+	private String cancelStatus;
+
 	//@ApiModelProperty(value = "安排日期")
 	private String reserveDate;
 
@@ -37,4 +40,3 @@ public class OrderQueryVo {
 	private String createTimeEnd;
 
 }
-

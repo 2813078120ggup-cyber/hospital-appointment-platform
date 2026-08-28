@@ -18,9 +18,8 @@ import org.springframework.web.client.RestTemplate;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +27,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
 class AppointmentToolsTest {
 
@@ -51,12 +51,13 @@ class AppointmentToolsTest {
     }
 
     @Test
-    void returnsTrueOnlyForExplicitAvailableResponse() {
+    void reportsExplicitAvailableResponse() {
         mockServer.expect(requestTo("http://localhost:8201/api/hosp/selectSchedule"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("{\"code\":200,\"data\":true}", MediaType.APPLICATION_JSON));
 
-        assertTrue(appointmentTools.querySchedule("内科", "2026-08-26", "上午", null));
+        assertEquals("有可预约号源",
+                appointmentTools.querySchedule("内科", "2026-08-26", "上午", null));
         mockServer.verify();
     }
 
@@ -72,17 +73,28 @@ class AppointmentToolsTest {
         DefaultToolExecutor executor = new DefaultToolExecutor(appointmentTools, method);
         ToolExecutionRequest request = ToolExecutionRequest.builder()
                 .id("query-1")
-                .name("查询是否有号源")
+                .name("query_schedule")
                 .arguments("{\"department\":\"内科\",\"date\":\"2026-08-26\",\"time\":\"上午\",\"doctorName\":\"张医生\"}")
                 .build();
 
-        assertEquals("true", executor.execute(request, null));
+        assertEquals("有可预约号源", executor.execute(request, null));
         mockServer.verify();
     }
 
     @Test
     void rejectsMissingRequiredParametersWithoutRemoteCall() {
-        assertFalse(appointmentTools.querySchedule("", "2026-08-26", "上午", null));
+        assertTrue(appointmentTools.querySchedule("", "2026-08-26", "上午", null)
+                .contains("参数不完整"));
+        mockServer.verify();
+    }
+
+    @Test
+    void distinguishesRemoteFailureFromNoAvailability() {
+        mockServer.expect(requestTo("http://localhost:8201/api/hosp/selectSchedule"))
+                .andRespond(withServerError());
+
+        assertEquals("号源服务暂时不可用，请稍后重试",
+                appointmentTools.querySchedule("内科", "2026-08-26", "上午", null));
         mockServer.verify();
     }
 
@@ -113,14 +125,15 @@ class AppointmentToolsTest {
                 .andRespond(withSuccess("{\"code\":20000,\"data\":{\"orderId\":88}}", MediaType.APPLICATION_JSON));
 
         AuthenticatedRequestContext.setToken("valid-token");
+        AuthenticatedRequestContext.setUserMessage("确认预约");
         Method method = AppointmentTools.class.getMethod("bookAppointment",
                 Long.class, String.class, String.class, String.class,
                 String.class, String.class, String.class);
         DefaultToolExecutor executor = new DefaultToolExecutor(appointmentTools, method);
         ToolExecutionRequest request = ToolExecutionRequest.builder()
                 .id("book-1")
-                .name("预约挂号")
-                .arguments("{\"username\":\"张三\",\"idCard\":\"123456789012345678\","
+                .name("book_appointment")
+                .arguments("{\"username\":\"张三\",\"idCardLast4\":\"5678\","
                         + "\"department\":\"内科\",\"date\":\"2026-08-26\","
                         + "\"time\":\"上午\"}")
                 .build();
@@ -133,8 +146,9 @@ class AppointmentToolsTest {
 
     @Test
     void requiresLoginBeforeCreatingFormalOrder() {
+        AuthenticatedRequestContext.setUserMessage("确认预约");
         String result = appointmentTools.bookAppointment(99L,
-                "张三", "123456789012345678", "内科", "2026-08-26", "上午", null);
+                "张三", "5678", "内科", "2026-08-26", "上午", null);
 
         assertTrue(result.contains("需要先登录"));
         mockServer.verify();
@@ -163,10 +177,31 @@ class AppointmentToolsTest {
                 .andRespond(withSuccess("{\"code\":20000,\"data\":{\"flag\":true}}", MediaType.APPLICATION_JSON));
 
         AuthenticatedRequestContext.setToken("valid-token");
+        AuthenticatedRequestContext.setUserMessage("确认取消预约");
         String result = appointmentTools.cancelAppointment(99L,
-                "张三", "123456789012345678", "内科", "2026-08-26", "上午", null);
+                "张三", "5678", "内科", "2026-08-26", "上午", null);
 
         assertEquals("取消预约成功", result);
+        mockServer.verify();
+    }
+
+    @Test
+    void rejectsFullCertificateNumberBeforeCallingRemoteServices() {
+        String result = appointmentTools.bookAppointment(99L,
+                "张三", "123456789012345678", "内科", "2026-08-26", "上午", null);
+
+        assertTrue(result.contains("请勿发送完整证件号"));
+        mockServer.verify();
+    }
+
+    @Test
+    void requiresExplicitConfirmationBeforeCreatingOrder() {
+        AuthenticatedRequestContext.setToken("valid-token");
+
+        String result = appointmentTools.bookAppointment(99L,
+                "张三", "5678", "内科", "2026-08-26", "上午", null);
+
+        assertTrue(result.contains("确认预约"));
         mockServer.verify();
     }
 

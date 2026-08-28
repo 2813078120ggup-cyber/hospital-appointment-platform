@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -119,5 +120,21 @@ public class HospitalApiController {
     @GetMapping("inner/getSignInfo/{hoscode}")
     public SignInfoVo getSignInfo(@PathVariable("hoscode") String hoscode) {
         return hospitalSetService.getSignInfo(hoscode);
+    }
+
+    /**
+     * 内部下单接口：在平台演示模式下由医院服务原子扣减 MongoDB 号源。
+     */
+    @PostMapping("inner/decrementAvailableNumber/{scheduleId}")
+    public boolean decrementAvailableNumber(@PathVariable("scheduleId") String scheduleId) {
+        return scheduleService.decrementAvailableNumber(scheduleId);
+    }
+
+    /**
+     * 内部取消接口：原子回补一个号源，库存不会超过总号源。
+     */
+    @PostMapping("inner/restoreAvailableNumber/{scheduleId}")
+    public boolean restoreAvailableNumber(@PathVariable("scheduleId") String scheduleId) {
+        return scheduleService.restoreAvailableNumber(scheduleId);
     }
 }

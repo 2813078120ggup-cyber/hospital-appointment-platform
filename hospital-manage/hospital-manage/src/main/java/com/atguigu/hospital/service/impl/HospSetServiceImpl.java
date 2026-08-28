@@ -18,7 +18,7 @@ public class HospSetServiceImpl implements HospSetService {
     @Autowired
     private HospitalSetMapper hospitalSetMapper;
 
-    @Value("${yygh.platform-api.base-url:http://localhost:8201}")
+    @Value("${yygh.platform-api.base-url:http://192.168.6.101:8201}")
     private String platformApiUrl;
 
     //同步签名秘钥

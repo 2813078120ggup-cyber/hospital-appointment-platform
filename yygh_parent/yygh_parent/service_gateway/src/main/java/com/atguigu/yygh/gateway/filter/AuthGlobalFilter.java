@@ -21,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 
 /**
  * 功能完善：统一保护管理端、用户 auth 接口和支付接口，并阻断外部访问 inner 接口。
@@ -29,13 +30,27 @@ import java.nio.charset.StandardCharsets;
 public class AuthGlobalFilter implements GlobalFilter, Ordered {
 
     private final SecretKey tokenSignKey;
+    private final boolean mockLoginEnabled;
+    private final String mockLoginToken;
+    private final long mockLoginUserId;
 
-    public AuthGlobalFilter(@Value("${yygh.jwt.secret:}") String jwtSecret) {
+    public AuthGlobalFilter(String jwtSecret) {
+        this(jwtSecret, false, "mock-token-1350000000", 26L);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuthGlobalFilter(@Value("${yygh.jwt.secret:}") String jwtSecret,
+                            @Value("${yygh.mock-login.enabled:false}") boolean mockLoginEnabled,
+                            @Value("${yygh.mock-login.token:mock-token-1350000000}") String mockLoginToken,
+                            @Value("${yygh.mock-login.user-id:26}") long mockLoginUserId) {
         if (!StringUtils.hasText(jwtSecret)
                 || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("YYGH_JWT_SECRET must contain at least 32 UTF-8 bytes");
         }
         this.tokenSignKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        this.mockLoginEnabled = mockLoginEnabled;
+        this.mockLoginToken = mockLoginToken;
+        this.mockLoginUserId = mockLoginUserId;
     }
 
     @Override
@@ -65,6 +80,9 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         }
 
         try {
+            if (mockLoginEnabled && mockLoginToken.equals(token)) {
+                token = createMockJwt();
+            }
             Jws<Claims> claims = Jwts.parserBuilder()
                     .setSigningKey(tokenSignKey)
                     .build()
@@ -87,6 +105,16 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
         } catch (Exception ex) {
             return writeError(exchange, HttpStatus.UNAUTHORIZED, 50008, "登录凭证已失效");
         }
+    }
+
+    private String createMockJwt() {
+        return Jwts.builder()
+                .setSubject("USER_INFO")
+                .setExpiration(new Date(System.currentTimeMillis() + 60 * 60 * 1000L))
+                .claim("userId", mockLoginUserId)
+                .claim("userName", "张老三")
+                .signWith(tokenSignKey)
+                .compact();
     }
 
     private boolean requiresAuthentication(String path) {

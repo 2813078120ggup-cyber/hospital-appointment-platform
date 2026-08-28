@@ -6,16 +6,15 @@
 
     });
 </script>
-<body class="fixed-sidebar full-height-layout gray-bg" style="overflow:hidden">
+<body class="fixed-sidebar full-height-layout gray-bg clinic-admin-shell" style="overflow:hidden">
 
-<div class="yb-top-title clearfix" style="height: 75px; top:0px;">
-    <!--<span class="logo-bg"><img th:src="@{/img/wd/logo2.png}" alt="wanda" width="48"/></span>-->
-    <span class="yb-top-desc fl hjyz">医院接口模拟管理系统</span>
+<div class="yb-top-title clearfix clinic-admin-header" style="height: 64px; top:0px;">
+    <span class="yb-top-desc fl hjyz"><i class="fa fa-hospital-o"></i> 医院预约挂号院端工作台</span>
     <span class="yb-help-center fr">
-        <!--
-        <i class="fa fa-question-circle"></i>
-        -->
-        <a href="javascript:void(0);">欢迎&nbsp;admin&nbsp;登录&nbsp;&nbsp;|</a>
+        <span class="status-badge status-ok">医院管理员</span>
+        <span>&nbsp;&nbsp;admin&nbsp;&nbsp;|&nbsp;&nbsp;</span>
+        <a href="/doctor/login"><i class="fa fa-user-md"></i> 医生入口</a>
+        <span>&nbsp;&nbsp;|&nbsp;&nbsp;</span>
         <a href="/logout">退出</a>
     </span>
 </div>
@@ -45,17 +44,41 @@
                     <div class="logo-element">
                     </div>
                 </li>
-                <li>
+                <li class="active">
                     <a href="#">
-                        <i class="fa fa-flask"></i>
-                        <span class="nav-label"> 医院推送管理</span>
+                        <i class="fa fa-dashboard"></i>
+                        <span class="nav-label"> 运营总览</span>
                         <span class="fa arrow"></span>
                     </a>
+                    <ul class="nav nav-second-level in">
+                        <li class="active"><a class="J_menuItem" th:href="@{/main}" data-index="90">今日工作台</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#"><i class="fa fa-hospital-o"></i><span class="nav-label"> 医院资料</span><span class="fa arrow"></span></a>
                     <ul class="nav nav-second-level">
-                        <li><a class="J_menuItem" th:href="@{/hospitalSet/index}" data-index="91">医院设置</a></li>
-                        <li><a class="J_menuItem" th:href="@{/hospital/index}" data-index="91">医院管理</a></li>
-                        <li><a class="J_menuItem" th:href="@{/department/list}" data-index="92">科室列表</a></li>
-                        <li><a class="J_menuItem" th:href="@{/schedule/list}" data-index="91">排班列表</a></li>
+                        <li><a class="J_menuItem" th:href="@{/hospitalSet/index}" data-index="91">平台接入设置</a></li>
+                        <li><a class="J_menuItem" th:href="@{/hospital/index}" data-index="92">医院基本信息</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#"><i class="fa fa-stethoscope"></i><span class="nav-label"> 医疗资源</span><span class="fa arrow"></span></a>
+                    <ul class="nav nav-second-level">
+                        <li><a class="J_menuItem" th:href="@{/department/list}" data-index="93">科室管理</a></li>
+                        <li><a class="J_menuItem" th:href="@{/admin/doctor/list}" data-index="94">医生账号</a></li>
+                        <li><a class="J_menuItem" th:href="@{/schedule/list}" data-index="95">排班与号源</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#"><i class="fa fa-calendar-check-o"></i><span class="nav-label"> 预约运营</span><span class="fa arrow"></span></a>
+                    <ul class="nav nav-second-level">
+                        <li><a class="J_menuItem" th:href="@{/admin/order/list}" data-index="96">预约记录</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#"><i class="fa fa-comments-o"></i><span class="nav-label"> 服务质量</span><span class="fa arrow"></span></a>
+                    <ul class="nav nav-second-level">
+                        <li><a class="J_menuItem" th:href="@{/feedback/list}" data-index="97">意见反馈</a></li>
                     </ul>
                 </li>
             </ul>

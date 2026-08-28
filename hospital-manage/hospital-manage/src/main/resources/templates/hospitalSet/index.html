@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:include="common/meta :: meta"></head>
-<body class="gray-bg">
-<div class="wrapper wrapper-content animated fadeInRight">
+<body class="clinic-page">
+<div class="clinic-form"><div class="clinic-header"><div><h1>平台接入设置</h1><p class="clinic-subtitle">配置医院与预约平台之间的安全同步参数。</p></div></div>
 
     <div class="row">
         <div class="col-sm-12">
-            <div class="ibox float-e-margins">
+            <div class="ibox clinic-card">
                 <div class="ibox-content">
                     <form id="ec" th:action="@{/hospitalSet/save}" method="post" class="form-horizontal">
                         <input type="hidden" name="id" value="1">
+                        <div class="clinic-note m-b-md">签名密钥只用于院端与平台接口校验，请妥善保管，不要提交到前端或日志。</div>
                         <div class="form-group">
                             <label class="col-sm-2 control-label">医院code：</label>
 
@@ -22,7 +23,7 @@
                             <label class="col-sm-2 control-label">签名key：</label>
 
                             <div class="col-sm-10">
-                                <input type="text" name="signKey" id="signKey" th:value="${hospitalSet.signKey}" class="form-control"/>
+                                <input type="password" name="signKey" id="signKey" th:value="${hospitalSet.signKey}" class="form-control" autocomplete="off"/>
                             </div>
                         </div>
                         <div class="hr-line-dashed"></div>

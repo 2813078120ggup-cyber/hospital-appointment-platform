@@ -13,7 +13,7 @@
         <span class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/notice/'+schedule.hoscode+'\''"> 预约须知 </span>
       </div>
       <div class="nav-item "><span
-        class="v-link clickable dark"> 停诊信息 </span>
+        class="v-link clickable dark" :onclick="'javascript:window.location=\'/hospital/suspend/'+schedule.hoscode+'\''"> 停诊信息 </span>
       </div>
       <div class="nav-item "><span
         class="v-link clickable dark"> 查询/取消 </span>

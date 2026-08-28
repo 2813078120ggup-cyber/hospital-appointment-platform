@@ -47,15 +47,31 @@ public class WeixinServiceImpl implements WeixinService {
     @Value("${weixin.pay.notify-url}")
     private String notifyUrl;
 
+    @Value("${yygh.mock-payment.enabled:false}")
+    private boolean mockPaymentEnabled;
+
     //生成微信支付二维码
     @Override
     public Map<String, Object> createNative(Long orderId, Long userId) {
-        requirePaymentConfiguration(false);
         //1 根据orderId查询订单信息
         OrderInfo orderInfo = this.packOrderInfo(requireOwnedOrder(orderId, userId));
         if (!OrderStatusEnum.UNPAID.getStatus().equals(orderInfo.getOrderStatus())) {
             throw new YyghException(20001, "当前订单状态不允许发起支付");
         }
+
+        if (mockPaymentEnabled) {
+            paymentInfoService.savePaymentInfo(orderInfo);
+            orderInfo.setOrderStatus(OrderStatusEnum.PAID.getStatus());
+            orderInfoMapper.updateById(orderInfo);
+            Map<String, Object> result = new HashMap<>();
+            result.put("orderId", orderId);
+            result.put("totalFee", orderInfo.getAmount());
+            result.put("resultCode", WXPayConstants.SUCCESS);
+            result.put("codeUrl", "mock://payment/" + orderId);
+            return result;
+        }
+
+        requirePaymentConfiguration(false);
 
         //2 向支付记录表添加支付记录（状态：正在支付）
         paymentInfoService.savePaymentInfo(orderInfo);
@@ -123,9 +139,19 @@ public class WeixinServiceImpl implements WeixinService {
     //1 调用微信接口，查询订单支付状态
     @Override
     public Map<String, String> queryPayStatus(Long orderId, Long userId) {
-        requirePaymentConfiguration(false);
         //根据orderId查询订单信息
         OrderInfo orderInfo = this.packOrderInfo(requireOwnedOrder(orderId, userId));
+        if (mockPaymentEnabled) {
+            Map<String, String> result = new HashMap<>();
+            result.put("return_code", WXPayConstants.SUCCESS);
+            result.put("result_code", WXPayConstants.SUCCESS);
+            result.put("trade_state", "SUCCESS");
+            result.put("out_trade_no", orderInfo.getOutTradeNo());
+            result.put("total_fee", toFen(orderInfo.getAmount()));
+            return result;
+        }
+
+        requirePaymentConfiguration(false);
         //封装微信查询支付状态接口需要参数，使用map集合
         Map paramMap = new HashMap<>();
         //微信公众号appid
@@ -170,7 +196,6 @@ public class WeixinServiceImpl implements WeixinService {
     //退款
     @Override
     public boolean refund(Long orderId) {
-        requirePaymentConfiguration(true);
         //1 根据orderId查询支付记录表，获取支付记录
         //为了退款获取支付记录 字段：trade_no
         PaymentInfo paymentInfo = paymentInfoService.getPaymentInfoByOrderId(orderId);
@@ -186,6 +211,17 @@ public class WeixinServiceImpl implements WeixinService {
         if(refundStatus.intValue() == RefundStatusEnum.REFUND.getStatus().intValue()) {
             return true;
         }
+
+        if (mockPaymentEnabled) {
+            refundInfo.setRefundStatus(RefundStatusEnum.REFUND.getStatus());
+            refundInfo.setCallbackTime(new Date());
+            refundInfo.setTradeNo("MOCK-REFUND-" + paymentInfo.getOutTradeNo());
+            refundInfo.setCallbackContent("{\"mockPayment\":true}");
+            refundInfoService.updateById(refundInfo);
+            return true;
+        }
+
+        requirePaymentConfiguration(true);
 
         //3 调用微信退款接口进行退款
         //封装微信退款接口需要参数，使用map

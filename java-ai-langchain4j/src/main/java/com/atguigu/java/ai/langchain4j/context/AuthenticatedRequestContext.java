@@ -6,7 +6,8 @@ package com.atguigu.java.ai.langchain4j.context;
  */
 public final class AuthenticatedRequestContext {
 
-    private static final ThreadLocal<String> TOKEN_HOLDER = new ThreadLocal<>();
+    private static final ThreadLocal<String> TOKEN_HOLDER = new InheritableThreadLocal<>();
+    private static final ThreadLocal<String> USER_MESSAGE_HOLDER = new InheritableThreadLocal<>();
 
     private AuthenticatedRequestContext() {
     }
@@ -23,7 +24,20 @@ public final class AuthenticatedRequestContext {
         return TOKEN_HOLDER.get();
     }
 
+    public static void setUserMessage(String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) {
+            USER_MESSAGE_HOLDER.remove();
+        } else {
+            USER_MESSAGE_HOLDER.set(userMessage.trim());
+        }
+    }
+
+    public static String getUserMessage() {
+        return USER_MESSAGE_HOLDER.get();
+    }
+
     public static void clear() {
         TOKEN_HOLDER.remove();
+        USER_MESSAGE_HOLDER.remove();
     }
 }

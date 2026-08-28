@@ -12,6 +12,7 @@ import com.atguigu.yygh.user.service.UserInfoService;
 import com.atguigu.yygh.vo.user.LoginVo;
 import com.atguigu.yygh.vo.user.UserAuthVo;
 import com.atguigu.yygh.vo.user.UserInfoQueryVo;
+import com.atguigu.yygh.vo.user.UserInfoUpdateVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -198,7 +199,9 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         //判断条件是否为空，进行封装
         QueryWrapper<UserInfo> wrapper = new QueryWrapper<>();
         if (!StringUtils.isEmpty(name)) {
-            wrapper.like("name", name);
+            wrapper.and(condition -> condition.like("name", name)
+                    .or().like("phone", name)
+                    .or().like("nick_name", name));
         }
         if (!StringUtils.isEmpty(status)) {
             wrapper.eq("status", status);
@@ -253,8 +256,47 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
     }
 
+    @Override
+    public void updateStatus(Long userId, Integer status) {
+        if (userId == null || (status == null || (status != 0 && status != 1))) {
+            throw new YyghException(20001, "用户状态参数不正确");
+        }
+        UserInfo userInfo = baseMapper.selectById(userId);
+        if (userInfo == null) {
+            throw new YyghException(20001, "用户不存在");
+        }
+        userInfo.setStatus(status);
+        baseMapper.updateById(userInfo);
+    }
+
+    //修改账号信息
+    @Override
+    public void updateUserInfo(Long userId, UserInfoUpdateVo updateVo) {
+        if (userId == null) {
+            throw new YyghException(20001, "登录已失效");
+        }
+        if (updateVo == null || (!StringUtils.hasText(updateVo.getName()) && !StringUtils.hasText(updateVo.getNickName()))) {
+            throw new YyghException(20001, "修改内容不能为空");
+        }
+        UserInfo userInfo = baseMapper.selectById(userId);
+        if (userInfo == null) {
+            throw new YyghException(20001, "用户不存在");
+        }
+        if (StringUtils.hasText(updateVo.getName())) {
+            userInfo.setName(updateVo.getName());
+        }
+        if (StringUtils.hasText(updateVo.getNickName())) {
+            userInfo.setNickName(updateVo.getNickName());
+        }
+        userInfo.setUpdateTime(new java.util.Date());
+        baseMapper.updateById(userInfo);
+    }
+
     //编号变成对应值封装
     private UserInfo packageUserInfo(UserInfo userInfo) {
+        if (userInfo == null) {
+            throw new YyghException(20001, "用户不存在");
+        }
         //处理认证状态编码
         userInfo.getParam().put("authStatusString", AuthStatusEnum.getStatusNameByStatus(userInfo.getAuthStatus()));
         //处理用户状态 0  1

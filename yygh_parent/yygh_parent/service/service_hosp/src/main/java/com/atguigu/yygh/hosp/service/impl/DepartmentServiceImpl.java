@@ -142,7 +142,40 @@ public class DepartmentServiceImpl implements DepartmentService {
 
     @Override
     public List<Department> findByDepname(String depname) {
-        return departmentRepository.findAllByDepname(depname);
+        // 匹配策略（按优先级依次尝试）：
+        // 1. depname 精确匹配
+        // 2. depname 模糊匹配（包含关键词）
+        // 3. bigname 精确匹配（把整个大科室下所有小科室都返回）
+        // 4. bigname 模糊匹配
+        // 最终合并去重
+        List<Department> result = new ArrayList<>();
+
+        List<Department> exact = departmentRepository.findAllByDepname(depname);
+        if (exact != null && !exact.isEmpty()) {
+            result.addAll(exact);
+        }
+
+        List<Department> fuzzyDep = departmentRepository.findAllByDepnameContaining(depname);
+        addIfAbsent(result, fuzzyDep);
+
+        List<Department> exactBig = departmentRepository.findAllByBigname(depname);
+        addIfAbsent(result, exactBig);
+
+        List<Department> fuzzyBig = departmentRepository.findAllByBignameContaining(depname);
+        addIfAbsent(result, fuzzyBig);
+
+        return result;
+    }
+
+    private void addIfAbsent(List<Department> target, List<Department> source) {
+        if (source == null) return;
+        for (Department d : source) {
+            boolean exists = target.stream().anyMatch(
+                    t -> d.getDepcode() != null && d.getDepcode().equals(t.getDepcode()));
+            if (!exists) {
+                target.add(d);
+            }
+        }
     }
 
 }

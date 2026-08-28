@@ -15,8 +15,31 @@ public interface ScheduleService {
     //获取排班分页列表
     Page<Schedule> selectPageSchedule(int page, int limit, String hoscode, String depcode);
 
+    // 医院运营端组合筛选排班，字段均为可选。
+    Page<Schedule> selectPageSchedule(int page, int limit, String hoscode, String depcode,
+                                      String doctorName, String workDate,
+                                      Integer status, String hosScheduleId);
+
     //删除
     void remove(String hoscode, String hosScheduleId);
+
+    //停诊/恢复排班状态
+    void suspend(String hoscode, String hosScheduleId, Integer status);
+
+    /**
+     * 原子扣减一个可预约号源。返回 false 表示排班不存在、停诊或已无号源。
+     */
+    boolean decrementAvailableNumber(String scheduleId);
+
+    /**
+     * 原子回补一个可预约号源。返回 false 表示排班不存在或库存已经恢复到总号源。
+     */
+    boolean restoreAvailableNumber(String scheduleId);
+
+    /**
+     * 将医院侧返回的最终库存安全同步到平台镜像。
+     */
+    boolean syncAvailableNumber(String scheduleId, Integer reservedNumber, Integer availableNumber);
 
     //根据医院编号 + 科室编号，查询可以预约日期数据，分页显示
     Map<String, Object> findScheduleRule(long page, long limit, String hoscode, String depcode);

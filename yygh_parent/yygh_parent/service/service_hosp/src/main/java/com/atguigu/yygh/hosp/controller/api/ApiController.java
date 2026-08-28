@@ -60,7 +60,8 @@ public class ApiController {
             if (available) {
                 return Result.ok(true).message("有可预约号源");
             }
-            return Result.fail(false).message("暂无可预约号源");
+            // 查询本身已成功，false 仅表示当前条件没有可用号源，不应被调用方误判为服务异常。
+            return Result.ok(false).message("暂无可预约号源");
         } catch (IllegalArgumentException exception) {
             return Result.fail(false).message(exception.getMessage());
         }
@@ -113,6 +114,34 @@ public class ApiController {
         return Result.ok();
     }
 
+    @Operation(description = "同步排班停诊/恢复状态")
+    @PostMapping("schedule/suspend")
+    public Result suspendSchedule(HttpServletRequest request) {
+        Map<String, Object> paramMap = HttpRequestHelper.switchMap(request.getParameterMap());
+        validateSignedRequest(paramMap);
+        String hoscode = requireText(paramMap, "hoscode", "医院编号");
+        String hosScheduleId = requireText(paramMap, "hosScheduleId", "医院排班编号");
+        Integer status = parseStatus(paramMap);
+        scheduleService.suspend(hoscode, hosScheduleId, status);
+        return Result.ok();
+    }
+
+    private Integer parseStatus(Map<String, Object> paramMap) {
+        Object value = paramMap.get("status");
+        if (value == null || !StringUtils.hasText(value.toString())) {
+            throw new YyghException(20001, "排班状态不能为空");
+        }
+        try {
+            int status = Integer.parseInt(value.toString());
+            if (status != -1 && status != 0 && status != 1) {
+                throw new NumberFormatException();
+            }
+            return status;
+        } catch (NumberFormatException exception) {
+            throw new YyghException(20001, "排班状态仅支持 -1/0/1");
+        }
+    }
+
     @Operation(description = "获取排班分页列表")
     @PostMapping("schedule/list")
     public Result schedule(HttpServletRequest request) {
@@ -121,11 +150,20 @@ public class ApiController {
 
         String hoscode = requireText(paramMap, "hoscode", "医院编号");
         String depcode = (String)paramMap.get("depcode");
+        String doctorName = (String)paramMap.get("doctorName");
+        String workDate = (String)paramMap.get("workDate");
+        String hosScheduleId = (String)paramMap.get("hosScheduleId");
+        Integer status = null;
+        Object statusValue = paramMap.get("status");
+        if (statusValue != null && StringUtils.hasText(statusValue.toString())) {
+            status = parseStatus(paramMap);
+        }
         int page = parsePositiveInt(paramMap, "page", 1, 10000);
         int limit = parsePositiveInt(paramMap, "limit", 10, 100);
 
         Page<Schedule> pageModel =
-                scheduleService.selectPageSchedule(page,limit,hoscode,depcode);
+                scheduleService.selectPageSchedule(page, limit, hoscode, depcode,
+                        doctorName, workDate, status, hosScheduleId);
         return Result.ok(pageModel);
     }
 

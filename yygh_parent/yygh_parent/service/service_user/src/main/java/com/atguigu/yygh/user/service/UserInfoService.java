@@ -4,6 +4,7 @@ import com.atguigu.yygh.model.user.UserInfo;
 import com.atguigu.yygh.vo.user.LoginVo;
 import com.atguigu.yygh.vo.user.UserAuthVo;
 import com.atguigu.yygh.vo.user.UserInfoQueryVo;
+import com.atguigu.yygh.vo.user.UserInfoUpdateVo;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -32,4 +33,10 @@ public interface UserInfoService extends IService<UserInfo> {
 
     //认证审批
     void approval(Long userId, Integer authStatus);
+
+    //平台管理员锁定或解锁用户。
+    void updateStatus(Long userId, Integer status);
+
+    //修改账号信息
+    void updateUserInfo(Long userId, UserInfoUpdateVo updateVo);
 }

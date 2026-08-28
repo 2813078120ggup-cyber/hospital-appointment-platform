@@ -110,28 +110,24 @@ methods: {
     },
     // 调用api层获取数据库中的数据
     fetchData(page = 1) {
-        console.log('翻页。。。' + page)
-        // 异步获取远程数据（ajax）
+        this.listLoading = true
         this.page = page
         userInfoApi.getPageList(this.page, this.limit, this.searchObj).then(
                 response => {
             this.list = response.data.pageModel.records
             this.total = response.data.pageModel.total
-            // 数据加载并绑定成功
+        }).finally(() => {
             this.listLoading = false
-        }
-      )
+        })
     },
     // 当页码发生改变的时候
     changeSize(size) {
-        console.log(size)
         this.limit = size
         this.fetchData(1)
     },
     // 重置查询表单
     resetData() {
-        console.log('重置查询表单')
-        this.searchObj = {}
+        this.searchObj = { authStatus: 1 }
         this.fetchData()
     }
   }

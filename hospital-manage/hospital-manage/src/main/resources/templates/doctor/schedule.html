@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="common/meta :: meta"></head>
+<body><div class="doctor-shell"><div th:replace="doctor/navigation :: navigation('schedule')"></div><main class="doctor-main">
+<div class="clinic-header"><div><h1>我的排班</h1><p class="clinic-subtitle">仅显示与当前医生姓名匹配的排班，可执行停诊或恢复。</p></div></div>
+<form class="clinic-toolbar" method="get" action="/doctor/schedule"><div class="form-group"><label>工作日期</label><input type="date" class="form-control" name="workDate" th:value="${workDate}"/></div><div class="form-group"><label>状态</label><select class="form-control" name="status"><option value="">全部</option><option value="1" th:selected="${status == 1}">可预约</option><option value="0" th:selected="${status == 0}">停约</option><option value="-1" th:selected="${status == -1}">停诊</option></select></div><button class="btn btn-clinic" type="submit">筛选</button><a class="btn btn-outline-clinic" href="/doctor/schedule">重置</a></form>
+<div class="clinic-card"><div class="ibox-content"><div class="table-responsive"><table class="table clinic-table"><thead><tr><th>日期</th><th>科室</th><th>时段</th><th>号源</th><th>挂号费</th><th>状态</th><th>操作</th></tr></thead><tbody><tr th:each="item : ${list}"><td th:text="${item.workDate}">日期</td><td th:text="${item.depcode}">科室</td><td th:text="${item.workTime == 0 ? '上午' : '下午'}">上午</td><td th:text="${item.availableNumber + ' / ' + item.reservedNumber}">0 / 0</td><td th:text="${item.amount ?: '-'}">-</td><td><span class="status-badge" th:classappend="${item.status == 1 ? ' status-ok' : (item.status == -1 ? ' status-stop' : ' status-warn')}" th:text="${item.status == 1 ? '可预约' : (item.status == -1 ? '停诊' : '停约')}">状态</span></td><td><button class="btn btn-xs btn-outline-clinic suspend" type="button" th:if="${item.status != -1}" th:attr="data-id=${item.id},data-status=-1">停诊</button><button class="btn btn-xs btn-outline-clinic suspend" type="button" th:if="${item.status == -1}" th:attr="data-id=${item.id},data-status=1">恢复</button></td></tr><tr th:if="${#lists.isEmpty(list)}"><td colspan="7" class="clinic-empty"><i class="fa fa-calendar-o"></i>暂无匹配排班</td></tr></tbody></table></div></div></div>
+</main></div>
+<script type="text/javascript">
+$(function(){
+    $(".suspend").on("click", function() {
+        var id = $(this).attr("data-id");
+        var status = $(this).attr("data-status");
+        if (!confirm(status == -1 ? "确认停诊该排班？停诊后患者将无法预约。" : "确认恢复该排班？")) {
+            return;
+        }
+        opt.load();
+        $.ajax({
+            url: "/doctor/suspend",
+            type: "POST",
+            dataType: "json",
+            data: { scheduleId: id, status: status },
+            success: function(res) {
+                if (res.code === 200) {
+                    window.location.reload();
+                } else {
+                    opt.alert(res.message);
+                }
+            },
+            error: function() { opt.alert("服务器繁忙,请稍后!"); }
+        });
+    });
+});
+</script>
+</body>
+</html>

@@ -96,7 +96,10 @@ public class HospitalServiceImpl implements HospitalService {
     @Override
     public void updateStatus(String id, Integer status) {
         if (status.intValue() == 0 || status.intValue() == 1) {
-            Hospital hospital = hospitalRepository.findById(id).get();
+            Hospital hospital = hospitalRepository.findById(id).orElse(null);
+            if (hospital == null) {
+                throw new com.atguigu.yygh.common.exception.YyghException(20001, "医院不存在");
+            }
             hospital.setStatus(status);
             hospital.setUpdateTime(new Date());
             hospitalRepository.save(hospital);
@@ -106,8 +109,11 @@ public class HospitalServiceImpl implements HospitalService {
     //获取医院详情
     @Override
     public Map<String, Object> showHosp(String id) {
-        //根据id查询
-        Hospital hospital = this.packHospital(hospitalRepository.findById(id).get());
+        Hospital hospital = hospitalRepository.findById(id).orElse(null);
+        if (hospital == null) {
+            throw new com.atguigu.yygh.common.exception.YyghException(20001, "医院不存在");
+        }
+        hospital = this.packHospital(hospital);
 
         Map<String, Object> result = new HashMap<>();
         //医院基本信息（包含医院等级）
@@ -127,8 +133,11 @@ public class HospitalServiceImpl implements HospitalService {
     //根据医院编号获取医院详情
     @Override
     public Map<String, Object> selectHospByHoscode(String hoscode) {
-        Map<String, Object> result = new HashMap<>();
         Hospital hosp = this.getHosp(hoscode);
+        if (hosp == null) {
+            throw new com.atguigu.yygh.common.exception.YyghException(20001, "医院不存在");
+        }
+        Map<String, Object> result = new HashMap<>();
         //医院详情
         Hospital hospital = this.packHospital(hosp);
         result.put("hospital", hospital);
@@ -139,22 +148,58 @@ public class HospitalServiceImpl implements HospitalService {
 
     //获取每个对象编号，远程调用根据编号获取名称，把获取名称封装Hospital对象的map里面
     private Hospital packHospital(Hospital hospital) {
+        if (hospital == null) {
+            return null;
+        }
+        if (hospital.getParam() == null) {
+            hospital.setParam(new HashMap<>());
+        }
         //获取每个对象编号
         String hostype = hospital.getHostype();//医院等级
         //省 市  区
         String provinceCode = hospital.getProvinceCode();
         String cityCode = hospital.getCityCode();
         String districtCode = hospital.getDistrictCode();
-        //远程调用根据编号获取对应名称
-        String provinceString = dictFeignClient.getName(provinceCode);
-        String cityString = dictFeignClient.getName(cityCode);
-        String districtString = dictFeignClient.getName(districtCode);
+        //远程调用根据编号获取对应名称，失败时使用编码作为兜底值
+        String provinceString = getDictNameFallback(provinceCode);
+        String cityString = getDictNameFallback(cityCode);
+        String districtString = getDictNameFallback(districtCode);
         //医院等级名称
-        String hostypeString = dictFeignClient.getName(DictEnum.HOSTYPE.getDictCode(), hostype);
+        String hostypeString = getDictNameFallback(DictEnum.HOSTYPE.getDictCode(), hostype);
 
         //数据封装map
         hospital.getParam().put("hostypeString", hostypeString);
         hospital.getParam().put("fullAddress", provinceString + cityString + districtString + hospital.getAddress());
         return hospital;
+    }
+
+    /**
+     * 安全调用字典服务，远程调用失败时返回编码本身作为兜底。
+     */
+    private String getDictNameFallback(String value) {
+        if (!org.springframework.util.StringUtils.hasText(value)) {
+            return "";
+        }
+        try {
+            String name = dictFeignClient.getName(value);
+            return name != null ? name : value;
+        } catch (Exception exception) {
+            return value;
+        }
+    }
+
+    /**
+     * 安全调用字典服务（带父级编码），远程调用失败时返回编码本身作为兜底。
+     */
+    private String getDictNameFallback(String parentDictCode, String value) {
+        if (!org.springframework.util.StringUtils.hasText(value)) {
+            return "";
+        }
+        try {
+            String name = dictFeignClient.getName(parentDictCode, value);
+            return name != null ? name : value;
+        } catch (Exception exception) {
+            return value;
+        }
     }
 }

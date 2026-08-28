@@ -60,7 +60,7 @@
         <el-table-column prop="phone" label="手机"/>
         <el-table-column label="是否结婚">
         <template slot-scope="scope">
-                {{ scope.row.isMarry == 1 ? '时' : '否' }}
+                {{ scope.row.isMarry == 1 ? '是' : '否' }}
         </template>
     </el-table-column>
     <el-table-column prop="param.fullAddress" label="地址"/>
@@ -80,7 +80,8 @@ export default {
         return {
             id: this.$route.params.id,
             userInfo: {}, // 会员信息
-            patientList: [] // 就诊人列表
+            patientList: [], // 就诊人列表
+            listLoading: true
         }
     },
     // 当页面加载时获取数据
@@ -93,6 +94,8 @@ export default {
             userInfoApi.show(this.id).then(response => {
                 this.userInfo = response.data.userInfo
                 this.patientList = response.data.patientList
+            }).finally(() => {
+                this.listLoading = false
             })
         },
         back() {

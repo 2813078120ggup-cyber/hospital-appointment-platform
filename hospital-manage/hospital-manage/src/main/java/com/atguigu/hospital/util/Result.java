@@ -16,6 +16,13 @@ public class Result<T> {
     @ApiModelProperty(value = "返回码")
     private Integer code;
 
+    /**
+     * 兼容院端旧版前端 util.js（ajax.post 检查 data.status === 200），
+     * status 与 code 保持同步。
+     */
+    @ApiModelProperty(value = "返回状态（与 code 同步，兼容旧前端）")
+    private Integer status;
+
     @ApiModelProperty(value = "返回消息")
     private String message;
 
@@ -35,6 +42,7 @@ public class Result<T> {
     public static <T> Result<T> build(T body, ResultCodeEnum resultCodeEnum) {
         Result<T> result = build(body);
         result.setCode(resultCodeEnum.getCode());
+        result.setStatus(resultCodeEnum.getCode());
         result.setMessage(resultCodeEnum.getMessage());
         return result;
     }
@@ -76,6 +84,7 @@ public class Result<T> {
 
     public Result<T> code(Integer code){
         this.setCode(code);
+        this.setStatus(code);
         return this;
     }
 }

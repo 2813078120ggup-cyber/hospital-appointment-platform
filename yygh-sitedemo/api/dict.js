@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-const api_name = '/admin/cmn/dict'
+const api_name = '/api/cmn/dict'
 export default {
     //查询所有医院等级，所有区县，所有....
     findByDictCode(dictCode) {

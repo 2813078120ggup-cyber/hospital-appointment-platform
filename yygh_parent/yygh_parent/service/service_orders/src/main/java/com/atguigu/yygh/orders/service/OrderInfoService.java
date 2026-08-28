@@ -2,6 +2,7 @@ package com.atguigu.yygh.orders.service;
 
 import com.atguigu.yygh.model.order.OrderInfo;
 import com.atguigu.yygh.vo.order.OrderCountQueryVo;
+import com.atguigu.yygh.vo.order.OrderQueryVo;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -28,11 +29,24 @@ public interface OrderInfoService extends IService<OrderInfo> {
      */
     IPage<OrderInfo> selectPageByUserId(Page<OrderInfo> pageParam, Long userId);
 
+    // 管理端订单列表、详情与运营汇总。
+    IPage<OrderInfo> selectAdminPage(Page<OrderInfo> pageParam, OrderQueryVo orderQueryVo);
+
+    OrderInfo getAdminOrderInfo(Long orderId);
+
+    Map<String, Object> getAdminSummary();
+
     //取消订单
     boolean cancelOrder(Long orderId, Long userId);
 
+    // 管理端取消订单，记录运营原因和管理员身份。
+    boolean cancelOrderByAdmin(Long orderId, String reason, String operator);
+
     // 功能完善：支付成功后把状态同步到医院系统，供轮询和支付回调复用。
     boolean updatePayStatusToHospital(Long orderId);
+
+    /** 由 outbox worker 重试已进入失败状态的取消、退款和医院状态同步流程。 */
+    boolean retryCancellationFromCompensation(Long orderId);
 
     //就医提醒
     void patientTips(String dateString);

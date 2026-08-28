@@ -45,7 +45,7 @@ class ApiControllerTest {
 
         Result<Boolean> result = apiController.selectSchedule(request);
 
-        assertThat(result.getCode()).isEqualTo(201);
+        assertThat(result.getCode()).isEqualTo(200);
         assertThat(result.getData()).isFalse();
         assertThat(result.getMessage()).isEqualTo("暂无可预约号源");
     }

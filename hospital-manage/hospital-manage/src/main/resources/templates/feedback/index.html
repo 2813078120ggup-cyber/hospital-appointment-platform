@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="common/meta :: meta"></head>
+<body class="gray-bg">
+<div id="app-container">
+<form id="ec" th:action="@{/feedback/list}" method="post" class="form-horizontal">
+    <input type="hidden"  name="pageSize" id="pageSize"  value="10"/>
+    <input type="hidden"  name="pageNum" id="pageNum"  th:value="${pageNum}"/>
+
+    <div class="wrapper wrapper-content animated fadeInRight">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="ibox float-e-margins">
+                    <div class="ibox-content">
+                        <div class="row m-b-sm m-t-sm">
+                            <div class="col-md-2" style="width: 150px">
+                                <button type="button" id="loading-example-btn" onclick="javascript:window.location.reload(true);" class="btn btn-white btn-sm"><i class="fa fa-refresh"></i> 刷新</button>
+                            </div>
+                        </div>
+                        <table class="table table-striped table-bordered table-hover dataTables-example">
+                            <thead>
+                            <tr>
+                                <th style="width: 50px">序号</th>
+                                <th>反馈人</th>
+                                <th>联系电话</th>
+                                <th>反馈内容</th>
+                                <th>提交时间</th>
+                                <th>状态</th>
+                                <th>处理回复</th>
+                                <th style="width: 140px">操作</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr class="gradeX" th:each="item,it : ${list}">
+                                <td th:text="${it.count}">1</td>
+                                <td th:text="${item.userName != null && item.userName != '' ? item.userName : '-'}">-</td>
+                                <td th:text="${item.phone != null && item.phone != '' ? item.phone : '-'}">-</td>
+                                <td class="feedback-content" th:text="${item.content}">反馈内容</td>
+                                <td th:text="${item.createTime}">2026-08-26 10:00:00</td>
+                                <td>
+                                    <span th:if="${item.status == 1}" class="label label-success">已处理</span>
+                                    <span th:if="${item.status == 0}" class="label label-danger">待处理</span>
+                                </td>
+                                <td th:text="${item.reply != null && item.reply != '' ? item.reply : '-'}">-</td>
+                                <td class="text-center">
+                                    <a class="btn btn-xs btn-primary handle" th:if="${item.status == 0}"
+                                       th:attr="data-id=${item.id},data-status=1">处理</a>
+                                    <a class="btn btn-xs btn-warning handle" th:if="${item.status == 1}"
+                                       th:attr="data-id=${item.id},data-status=0">重新打开</a>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(list)}">
+                                <td colspan="8" class="text-center">暂无反馈</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <el-pagination
+                        :current-page="pageNum"
+                        :total="total"
+                        :page-size="pageSize"
+                        style="padding: 30px 0; text-align: center;"
+                        layout="sizes, prev, pager, next, jumper, ->, total, slot"
+                        @current-change="fetchData"
+                />
+            </div>
+        </div>
+    </div>
+</form>
+</div>
+<script>
+var app = new Vue({
+    el: '#app-container',
+
+    data() {
+        return {
+            total: [[${total}]], // 数据库中的总记录数
+            pageNum: [[${pageNum}]], // 默认页码
+            pageSize: 10 // 每页记录数
+        }
+    },
+
+    methods: {
+        fetchData(page = 1) {
+            document.forms.ec.pageNum.value=page
+            document.forms.ec.submit();
+        }
+    }
+})
+</script>
+<script th:inline="javascript">
+    $(function(){
+        $(".handle").on("click", function(){
+            var id = $(this).attr("data-id");
+            var status = $(this).attr("data-status");
+            var reply = "";
+            if (status == "1") {
+                reply = prompt("请输入处理回复（选填）：", "");
+                if (reply == null) {
+                    return;
+                }
+            }
+            var form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/feedback/handle";
+            var fId = document.createElement("input"); fId.type = "hidden"; fId.name = "id"; fId.value = id; form.appendChild(fId);
+            var fStatus = document.createElement("input"); fStatus.type = "hidden"; fStatus.name = "status"; fStatus.value = status; form.appendChild(fStatus);
+            var fReply = document.createElement("input"); fReply.type = "hidden"; fReply.name = "reply"; fReply.value = reply; form.appendChild(fReply);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+</script>
+</body>
+</html>

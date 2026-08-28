@@ -71,9 +71,12 @@ public class PaymentInfoServiceImpl extends ServiceImpl<PaymentInfoMapper, Payme
             throw new YyghException(20001, "支付对应的订单不存在");
         }
         //设置修改数据，
-        orderInfo.setOrderStatus(OrderStatusEnum.PAID.getStatus());
-        //调用方法更新
-        orderInfoMapper.updateById(orderInfo);
+        // 取消流程与支付回调可能并发到达；已取消订单不能被重复回调恢复成“已支付”，
+        // 否则退款/医院状态补偿会失去终态依据。支付记录仍照常幂等更新为已支付。
+        if (!OrderStatusEnum.CANCLE.getStatus().equals(orderInfo.getOrderStatus())) {
+            orderInfo.setOrderStatus(OrderStatusEnum.PAID.getStatus());
+            orderInfoMapper.updateById(orderInfo);
+        }
 
         //2 根据交易号，更新支付记录：已经支付
         LambdaQueryWrapper<PaymentInfo> wrapper = new LambdaQueryWrapper<>();

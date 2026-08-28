@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="common/meta :: meta"></head>
+<body>
+<div class="login-shell"><div class="login-card">
+    <div class="login-mark"><i class="fa fa-user-md"></i></div><h1>医生工作台</h1>
+    <p class="lead">使用医院管理员创建的医生姓名和密码登录。</p>
+    <form role="form"><div class="form-group"><label>医生姓名</label><input type="text" name="username" id="username" maxlength="30" class="form-control" placeholder="请输入医生姓名" autocomplete="username"/></div>
+    <div class="form-group"><label>登录密码</label><input type="password" name="password" id="password" maxlength="30" class="form-control" placeholder="请输入密码" autocomplete="current-password"/></div>
+    <button type="button" id="login" class="btn btn-clinic btn-block">登 录</button><p class="text-center m-t-md"><a href="/">返回医院管理端</a></p></form>
+</div></div>
+<script type="text/javascript">
+$(function(){
+    $("#login").on("click", function() {
+        var username = $("#username").val();
+        var password = $("#password").val();
+        if (username == "") { opt.alert("请输入您的账号!"); return; }
+        if (password == "") { opt.alert("请输入您的密码!"); return; }
+        $.ajax({
+            url: "/doctor/login",
+            type: "POST",
+            dataType: "json",
+            data: { username: username, password: password },
+            success: function(res) {
+                if (res.code === 200) {
+                    window.location.href = "/doctor/workbench";
+                } else {
+                    opt.alert(res.message);
+                }
+            },
+            error: function() { opt.alert("服务器繁忙,请稍后!"); }
+        });
+    });
+
+    if(window.top !== window.self){ window.top.location = window.location;}
+    document.onkeydown = function(e) {
+        var evt = e || window.event || null;
+        if (evt.keyCode == 13) {
+            document.getElementById('login').click();
+        }
+    }
+});
+</script>
+</body>
+</html>

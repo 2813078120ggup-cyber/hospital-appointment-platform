@@ -23,5 +23,13 @@ export default {
              method: 'post',
              data: userAuah
         })
+    },
+    //修改账号信息
+    updateUserInfo(updateVo) {
+        return request({
+            url: `${api_name}/auth/updateUserInfo`,
+            method: 'post',
+            data: updateVo
+        })
     }
 }

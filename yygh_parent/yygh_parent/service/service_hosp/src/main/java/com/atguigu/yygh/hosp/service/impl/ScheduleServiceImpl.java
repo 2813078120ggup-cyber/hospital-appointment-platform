@@ -23,6 +23,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -171,6 +174,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             throw new IllegalArgumentException("日期不能为空");
         }
         try {
+            // 使用 JVM 默认时区（UTC+8）解析，与前端 new DateTime(workDate).toDate() 行为一致
+            // 前端代码：DateTime("2026-08-28", UTC+8) → 内部 = UTC 2026-08-27T16:00:00Z
+            // MongoDB 存的也是：ISODate("2026-08-27T16:00:00Z") ← 完美匹配！
             return DateTimeFormat.forPattern("yyyy-MM-dd")
                     .parseDateTime(date.trim())
                     .withTimeAtStartOfDay()
@@ -222,6 +228,13 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public Page<Schedule> selectPageSchedule(int page, int limit, String hoscode, String depcode) {
+        return selectPageSchedule(page, limit, hoscode, depcode, null, null, null, null);
+    }
+
+    @Override
+    public Page<Schedule> selectPageSchedule(int page, int limit, String hoscode, String depcode,
+                                             String doctorName, String workDate,
+                                             Integer status, String hosScheduleId) {
         Sort sort = Sort.by(Sort.Direction.DESC, "createTime");
         //0为第一页
         Pageable pageable = PageRequest.of(page - 1, limit, sort);
@@ -229,6 +242,13 @@ public class ScheduleServiceImpl implements ScheduleService {
         Schedule schedule = new Schedule();
         schedule.setHoscode(hoscode);
         schedule.setDepcode(depcode);
+        schedule.setDocname(doctorName);
+        if (org.springframework.util.StringUtils.hasText(workDate)) {
+            schedule.setWorkDate(DateTimeFormat.forPattern("yyyy-MM-dd")
+                    .parseDateTime(workDate.trim()).withTimeAtStartOfDay().toDate());
+        }
+        schedule.setStatus(status);
+        schedule.setHosScheduleId(hosScheduleId);
         Example<Schedule> example = Example.of(schedule);
 
         // 功能完善：分页查询必须应用医院和科室条件，避免跨医院返回排班。
@@ -243,6 +263,94 @@ public class ScheduleServiceImpl implements ScheduleService {
         if (null != schedule) {
             scheduleRepository.deleteById(schedule.getId());
         }
+    }
+
+    //停诊/恢复排班状态
+    @Override
+    public void suspend(String hoscode, String hosScheduleId, Integer status) {
+        if (status == null || (status != -1 && status != 0 && status != 1)) {
+            throw new YyghException(20001, "排班状态仅支持 -1/0/1");
+        }
+        Query query = Query.query(Criteria.where("hoscode").is(hoscode)
+                .and("hosScheduleId").is(hosScheduleId));
+        Update update = new Update()
+                .set("status", status)
+                .set("updateTime", new Date());
+        Schedule schedule = mongoTemplate.findAndModify(query, update,
+                FindAndModifyOptions.options().returnNew(true), Schedule.class);
+        if (schedule == null) {
+            throw new YyghException(20001, "排班不存在");
+        }
+        // 停诊/停约只改变状态，不清空库存；恢复时沿用停诊前的真实剩余号源，
+        // 避免将已被预约的号源错误重置为总号源导致超卖。
+    }
+
+    @Override
+    public boolean decrementAvailableNumber(String scheduleId) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()) {
+            return false;
+        }
+        Query query = Query.query(Criteria.where("_id").is(scheduleId.trim())
+                .and("status").is(1)
+                .and("availableNumber").gt(0));
+        Update update = new Update()
+                .inc("availableNumber", -1)
+                .set("updateTime", new Date());
+        // MongoDB 的 findAndModify 在服务端以单文档原子方式执行条件判断和扣减，
+        // 并发请求最多只有库存数量个请求能拿到非空结果。
+        return mongoTemplate.findAndModify(query, update,
+                FindAndModifyOptions.options().returnNew(true), Schedule.class) != null;
+    }
+
+    @Override
+    public boolean restoreAvailableNumber(String scheduleId) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()) {
+            return false;
+        }
+        String normalizedId = scheduleId.trim();
+        // 回补使用乐观 CAS：先读当前值，再以“当前值仍未变化”为条件原子 +1，
+        // 从而既不超过总号源，也不会因并发取消重复回补。
+        for (int attempt = 0; attempt < 8; attempt++) {
+            Schedule current = scheduleRepository.findById(normalizedId).orElse(null);
+            if (current == null || current.getAvailableNumber() == null
+                    || current.getReservedNumber() == null
+                    || current.getAvailableNumber() >= current.getReservedNumber()) {
+                return false;
+            }
+            Integer available = current.getAvailableNumber();
+            Integer reserved = current.getReservedNumber();
+            Query query = Query.query(Criteria.where("_id").is(normalizedId)
+                    .and("availableNumber").is(available)
+                    // 总号源也必须保持为刚才读取的版本；否则排班同步在
+                    // 读写之间降低总号源时，旧快照可能把剩余号源加到上限之上。
+                    .and("reservedNumber").is(reserved));
+            Update update = new Update()
+                    .inc("availableNumber", 1)
+                    .set("updateTime", new Date());
+            if (mongoTemplate.findAndModify(query, update,
+                    FindAndModifyOptions.options().returnNew(true), Schedule.class) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean syncAvailableNumber(String scheduleId,
+                                       Integer reservedNumber,
+                                       Integer availableNumber) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()
+                || reservedNumber == null || availableNumber == null
+                || reservedNumber < 0 || availableNumber < 0
+                || availableNumber > reservedNumber) {
+            return false;
+        }
+        Query query = Query.query(Criteria.where("_id").is(scheduleId.trim()));
+        Update update = new Update()
+                .set("reservedNumber", reservedNumber)
+                .set("availableNumber", availableNumber)
+                .set("updateTime", new Date());
+        return mongoTemplate.updateFirst(query, update, Schedule.class).getMatchedCount() == 1;
     }
 
     //MongoTemplate聚合操作
@@ -349,6 +457,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         //1 获取所有显示日期  根据当前日期 + 预约周期
         //根据医院编号获取预约信息
         Hospital hospital = hospitalService.getHosp(hoscode);
+        if (hospital == null) {
+            throw new com.atguigu.yygh.common.exception.YyghException(20001, "医院不存在");
+        }
         //获取预约规则
         BookingRule bookingRule = hospital.getBookingRule();
         //根据当前日期 + 预约周期获取每页显示日期数据
@@ -437,13 +548,14 @@ public class ScheduleServiceImpl implements ScheduleService {
         //其他基础数据
         Map<String, String> baseMap = new HashMap<>();
         //医院名称
-        baseMap.put("hosname", hospitalService.getHosp(hoscode).getHosname());
+        Hospital hospForName = hospitalService.getHosp(hoscode);
+        baseMap.put("hosname", hospForName != null ? hospForName.getHosname() : "");
         //科室
         Department department = departmentService.getDepartment(hoscode, depcode);
         //大科室名称
-        baseMap.put("bigname", department.getBigname());
+        baseMap.put("bigname", department != null ? department.getBigname() : "");
         //科室名称
-        baseMap.put("depname", department.getDepname());
+        baseMap.put("depname", department != null ? department.getDepname() : "");
         //月
         baseMap.put("workDateString", new DateTime().toString("yyyy年MM月"));
         //放号时间
@@ -469,10 +581,14 @@ public class ScheduleServiceImpl implements ScheduleService {
         String depcode = schedule.getDepcode();
         //医院名称
         Hospital hosp = hospitalService.getHosp(hoscode);
-        schedule.getParam().put("hosname", hosp.getHosname());
+        if (hosp != null) {
+            schedule.getParam().put("hosname", hosp.getHosname());
+        }
         //科室名称
         Department department = departmentService.getDepartment(hoscode, depcode);
-        schedule.getParam().put("depname", department.getDepname());
+        if (department != null) {
+            schedule.getParam().put("depname", department.getDepname());
+        }
 
         return schedule;
     }

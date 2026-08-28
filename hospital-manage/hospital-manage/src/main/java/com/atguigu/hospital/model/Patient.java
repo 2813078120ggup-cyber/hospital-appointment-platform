@@ -84,5 +84,16 @@ public class Patient extends BaseEntity {
 	@TableField("contacts_phone")
 	private String contactsPhone;
 
-}
+	@ApiModelProperty(value = "就诊卡号")
+	@TableField("card_no")
+	private String cardNo;
 
+	@ApiModelProperty(value = "是否有医保")
+	@TableField("is_insure")
+	private Integer isInsure;
+
+	@ApiModelProperty(value = "状态（0：默认 1：已认证）")
+	@TableField("status")
+	private Integer status;
+
+}

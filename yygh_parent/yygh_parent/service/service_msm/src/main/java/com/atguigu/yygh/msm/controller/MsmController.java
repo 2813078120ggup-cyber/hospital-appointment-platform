@@ -30,6 +30,9 @@ public class MsmController {
     //根据手机号发送短信验证码
     @GetMapping(value = "/send/{phone}")
     public R code(@PathVariable String phone) {
+        if (phone != null) {
+            phone = phone.trim();
+        }
         if (phone == null || !PHONE_PATTERN.matcher(phone).matches()) {
             throw new YyghException(20001, "手机号格式不正确");
         }

@@ -22,5 +22,11 @@ export default {
             url: `${api_name}/approval/${id}/${authStatus}`,
             method: 'get'
         })
+    },
+    updateStatus(id, status) {
+        return request({
+            url: `${api_name}/updateStatus/${id}/${status}`,
+            method: 'put'
+        })
     }
 }

@@ -11,6 +11,7 @@
       </div>
       <!-- 公共底 -->
       <myfooter/>
+      <xiaozhi-assistant/>
     </div>
   </div>
 </template>
@@ -22,11 +23,12 @@ import '~/assets/css/main.css'
 
 import myheader from './myheader'
 import myfooter from './myfooter'
+import XiaozhiAssistant from '~/components/XiaozhiAssistant'
 
 export default {
 
   components: {
-    myheader,myfooter
+    myheader, myfooter, XiaozhiAssistant
   },
 
   mounted() {

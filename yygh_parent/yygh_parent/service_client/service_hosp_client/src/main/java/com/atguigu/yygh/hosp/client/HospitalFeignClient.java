@@ -6,6 +6,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @FeignClient(value = "service-hosp")
 @Repository
@@ -17,5 +18,11 @@ public interface HospitalFeignClient {
 
     @GetMapping("/api/hosp/hospital/inner/getSignInfo/{hoscode}")
     SignInfoVo getSignInfo(@PathVariable("hoscode") String hoscode);
+
+    @PostMapping("/api/hosp/hospital/inner/decrementAvailableNumber/{scheduleId}")
+    Boolean decrementAvailableNumber(@PathVariable("scheduleId") String scheduleId);
+
+    @PostMapping("/api/hosp/hospital/inner/restoreAvailableNumber/{scheduleId}")
+    Boolean restoreAvailableNumber(@PathVariable("scheduleId") String scheduleId);
 
 }

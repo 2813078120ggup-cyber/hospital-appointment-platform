@@ -51,13 +51,15 @@
         <el-table-column prop="hosname" label="医院名称"/>
         <el-table-column prop="param.hostypeString" label="等级" width="90"/>
         <el-table-column prop="param.fullAddress" label="详情地址"/>
-        <el-table-column label="状态" width="80">
+        <el-table-column label="状态" width="90" align="center">
             <template slot-scope="scope">
-                    {{ scope.row.status === 0 ? '未上线' : '已上线' }}
+                <el-tag :type="Number(scope.row.status) === 1 ? 'success' : 'info'">
+                    {{ Number(scope.row.status) === 1 ? '已上线' : '未上线' }}
+                </el-tag>
             </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间"/>
-        <el-table-column label="操作" width="230" align="center">
+        <el-table-column label="操作" width="280" align="center">
             <template slot-scope="scope">
                 <router-link :to="'/yygh/hospset/hospital/show/'+scope.row.id">
                     <el-button type="primary" size="mini">查看</el-button>
@@ -65,8 +67,8 @@
                 <router-link :to="'/yygh/hospset/hospital/schedule/'+scope.row.hoscode">
                     <el-button type="primary" size="mini">排班</el-button>
                 </router-link>
-                <el-button v-if="scope.row.status == 1"  type="primary" size="mini" @click="updateStatus(scope.row.id, 0)">下线</el-button>
-                <el-button v-if="scope.row.status == 0"  type="danger" size="mini" @click="updateStatus(scope.row.id, 1)">上线</el-button>
+                <el-button v-if="Number(scope.row.status) === 1" type="warning" size="mini" @click="updateStatus(scope.row.id, 0)">下线</el-button>
+                <el-button v-else type="success" size="mini" @click="updateStatus(scope.row.id, 1)">上线</el-button>
             </template>
         </el-table-column>
     </el-table>
@@ -113,13 +115,14 @@ export default {
         //医院列表
         fetchData(page=1) {
             this.page = page
+            this.listLoading = true
             hospApi.getPageList(this.page,this.limit,this.searchObj)
                 .then(response => {
                     //每页数据集合
                     this.list = response.data.pages.content
                     //总记录数
                     this.total = response.data.pages.totalElements
-                    //加载图表不显示
+                }).finally(() => {
                     this.listLoading = false
                 })
         },
@@ -138,14 +141,24 @@ export default {
             //调用方法，根据省id，查询下面子节点
             hospApi.findByParentId(this.searchObj.provinceCode)
                 .then(response => {
-                    console.log(response.data.list)
                     this.cityList = response.data.list
                 })
         },
         //分页，页码变化
-        changeSize() {
+        changeSize(size) {
             this.limit = size
             this.fetchData(1)
+        },
+        updateStatus(id, status) {
+            const action = status === 1 ? '上线' : '下线'
+            this.$confirm(`确定要${action}该医院吗？`, '医院状态确认', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            }).then(() => hospApi.updateStatus(id, status)).then(() => {
+                this.$message.success(`${action}成功`)
+                this.fetchData(this.page)
+            }).catch(() => {})
         },
         resetData() {
           this.cityList = []

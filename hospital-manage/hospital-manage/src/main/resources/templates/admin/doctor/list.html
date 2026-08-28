@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:include="common/meta :: meta"></head>
+<body class="clinic-page">
+<div class="clinic-header"><div><h1>医生账号</h1><p class="clinic-subtitle">维护可登录医生端的账号。医生姓名即登录名，停用后无法登录。</p></div><a class="btn btn-clinic" href="/admin/doctor/form"><i class="fa fa-plus"></i> 新增医生</a></div>
+<form class="clinic-toolbar" method="get" action="/admin/doctor/list">
+    <div class="form-group"><label>姓名 / 职称</label><input class="form-control" name="keyword" th:value="${keyword}" placeholder="搜索医生"/></div>
+    <div class="form-group"><label>账号状态</label><select class="form-control" name="status"><option value="">全部状态</option><option value="1" th:selected="${status == 1}">启用</option><option value="0" th:selected="${status == 0}">停用</option></select></div>
+    <button class="btn btn-clinic" type="submit"><i class="fa fa-search"></i> 查询</button><a class="btn btn-outline-clinic" href="/admin/doctor/list">重置</a>
+</form>
+<div class="clinic-card"><div class="ibox-content"><div class="table-responsive" th:if="${list != null && !list.isEmpty()}"><table class="table clinic-table"><thead><tr><th>姓名</th><th>登录名</th><th>职称</th><th>联系电话</th><th>状态</th><th>操作</th></tr></thead><tbody>
+<tr th:each="item : ${list}"><td><strong th:text="${item.docname}">医生</strong></td><td th:text="${item.username}">医生</td><td th:text="${item.title ?: '-'}">-</td><td th:text="${item.phone ?: '-'}">-</td><td><span class="status-badge" th:classappend="${item.status == 1 ? ' status-ok' : ' status-muted'}" th:text="${item.status == 1 ? '启用' : '停用'}">启用</span></td><td class="actions"><a class="btn btn-xs btn-outline-clinic" th:href="@{/admin/doctor/form(id=${item.id})}">编辑</a><button class="btn btn-xs btn-outline-clinic js-status" type="button" th:attr="data-id=${item.id},data-status=${item.status == 1 ? 0 : 1}" th:text="${item.status == 1 ? '停用' : '启用'}">停用</button><button class="btn btn-xs btn-outline-clinic js-reset" type="button" th:attr="data-id=${item.id}">重置密码</button></td></tr>
+</tbody></table></div><div class="clinic-empty" th:if="${list == null || list.isEmpty()}"><i class="fa fa-user-md"></i>暂无医生账号</div></div></div>
+<div th:if="${totalPages > 1}" class="text-center"><ul class="pagination"><li th:classappend="${pageNum == 1 ? 'disabled' : ''}"><a th:href="@{/admin/doctor/list(pageNum=${pageNum - 1},pageSize=${pageSize},keyword=${keyword},status=${status})}">上一页</a></li><li th:each="p : ${#numbers.sequence(1,totalPages)}" th:classappend="${p == pageNum ? 'active' : ''}"><a th:href="@{/admin/doctor/list(pageNum=${p},pageSize=${pageSize},keyword=${keyword},status=${status})}" th:text="${p}">1</a></li><li th:classappend="${pageNum == totalPages ? 'disabled' : ''}"><a th:href="@{/admin/doctor/list(pageNum=${pageNum + 1},pageSize=${pageSize},keyword=${keyword},status=${status})}">下一页</a></li></ul></div>
+<script th:inline="javascript">
+$(function(){ function post(url,data){ $.post(url,data).done(function(r){ if(r.code === 200){ window.location.reload(); } else { alert(r.message || '操作失败'); } }).fail(function(){ alert('网络异常，请稍后重试'); }); }
+$('.js-status').on('click',function(){ if(confirm('确认修改该医生账号状态？')) post('/admin/doctor/status',{id:$(this).data('id'),status:$(this).data('status')}); });
+$('.js-reset').on('click',function(){ if(confirm('确认将密码重置为系统默认密码？')) post('/admin/doctor/reset-password',{id:$(this).data('id')}); }); });
+</script></body></html>

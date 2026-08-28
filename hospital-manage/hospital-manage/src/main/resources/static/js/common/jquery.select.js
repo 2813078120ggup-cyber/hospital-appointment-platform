@@ -8,7 +8,7 @@
 		var defaults={
 			key:"privince|city",                                                //下拉列表联动id
 			value:"1|1066",                                                     //下拉列表联动value
-			path:"http://localhost:9000/dict/parId/"       // 功能完善：本地联调默认连接 localhost
+			path:"http://192.168.6.101:9000/dict/parId/"       // 功能完善：默认连接 192.168.6.101 字典服务
 		};
 	
 		var options=$.extend(defaults,options);

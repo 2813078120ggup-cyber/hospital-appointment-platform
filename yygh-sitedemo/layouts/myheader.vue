@@ -2,13 +2,13 @@
     <div class="header-container">
         <div class="wrapper">
         <!-- logo -->
-            <div class="left-wrapper v-link selected">
+            <div class="left-wrapper v-link selected" @click="goHome">
                 <img style="width: 50px" width="50" height="50" src="~assets/images/logo.png">
                 <span class="text">尚医通 预约挂号统一平台</span>
             </div>
         <!-- 右侧 -->
         <div class="right-wrapper">
-          <span class="v-link clickable">帮助中心</span>
+          <nuxt-link to="/help" class="v-link clickable help-link">帮助中心</nuxt-link>
           <span v-if="name == ''" class="v-link clickable" @click="showLogin()" id="loginDialog">登录/注册</span>
           <el-dropdown v-if="name != ''" @command="loginMenu">
                 <span class="el-dropdown-link">
@@ -91,16 +91,18 @@
 <script>
 import cookie from 'js-cookie'
 import Vue from 'vue'
-import userInfoApi from '@/api/userInfo'
-import smsApi from '@/api/msm'
 // 1、引入api
 import weixinApi from '@/api/wx'
+
+const MOCK_LOGIN_PHONE = '1350000000'
+const MOCK_LOGIN_NAME = '张老三'
+const MOCK_LOGIN_CODE = '666666'
 
 const defaultDialogAtrr = {
   showLoginType: 'phone', // 控制手机登录与微信登录切换
   labelTips: '手机号码', // 输入框提示
   inputValue: '', // 输入框绑定对象
-  placeholder: '输入手机号,固定输入1350000000', // 输入框placeholder
+  placeholder: '输入手机号', // 输入框placeholder
   maxlength: 11, // 输入框长度控制
   loginBtn: '获取验证码', // 登录按钮或获取验证码按钮文本
   sending: true,      // 是否可以发送验证码
@@ -112,7 +114,7 @@ export default {
     return {
       userInfo: {
         phone: '',
-        code: '6666',
+        code: '',
         openid: ''
       },
       dialogUserFormVisible: false,
@@ -164,7 +166,12 @@ export default {
     btnClick() {
       // 判断是获取验证码还是登录
       if(this.dialogAtrr.loginBtn == '获取验证码') {
-        this.userInfo.phone = '1350000000';//this.dialogAtrr.inputValue
+        const phone = this.dialogAtrr.inputValue.trim()
+        if (phone !== MOCK_LOGIN_PHONE) {
+          this.$message.error('请输入测试账号手机号 1350000000')
+          return
+        }
+        this.userInfo.phone = phone
         // 获取验证码
         this.getCodeFun()
       } else {
@@ -180,7 +187,7 @@ export default {
     },
     // 登录
     login() {
-      this.userInfo.code = '6666';//this.dialogAtrr.inputValue
+      this.userInfo.code = this.dialogAtrr.inputValue.trim()
       if(this.dialogAtrr.loginBtn == '正在提交...') {
         this.$message.error('重复提交')
         return;
@@ -189,23 +196,24 @@ export default {
         this.$message.error('验证码必须输入')
         return;
       }
-      if (this.userInfo.code.length != 4) {
+      if (!/^\d{6}$/.test(this.userInfo.code)) {
         this.$message.error('验证码格式不正确')
         return;
       }
+      if (this.userInfo.code !== MOCK_LOGIN_CODE) {
+        this.$message.error('测试验证码为 666666')
+        return;
+      }
       this.dialogAtrr.loginBtn = '正在提交...'
-      userInfoApi.login(this.userInfo).then(response => {
-        console.log(response.data)
-        // 登录成功 设置cookie
-        this.setCookies(response.data.name, response.data.token)
-      }).catch(e => {
-        this.dialogAtrr.loginBtn = '马上登录'
-      })
+      this.setCookies(MOCK_LOGIN_NAME, `mock-token-${this.userInfo.phone}`)
     },
     setCookies(name, token) {
-      cookie.set('token', token, { domain: 'localhost' })
-      cookie.set('name', name, { domain: 'localhost' })
+      cookie.set('token', token, { path: '/' })
+      cookie.set('name', name, { path: '/' })
       window.location.reload()
+    },
+    goHome() {
+      window.location.href = '/'
     },
     // 获取验证码
     getCodeFun() {
@@ -215,21 +223,14 @@ export default {
       // }
       // 初始化验证码相关属性
       this.dialogAtrr.inputValue = ''
-      this.dialogAtrr.placeholder = '输入验证码，固定输入 6666'
+      this.dialogAtrr.placeholder = '输入测试验证码 666666'
       this.dialogAtrr.maxlength = 6
       this.dialogAtrr.loginBtn = '马上登录'
       // 控制重复发送
       if (!this.dialogAtrr.sending) return;
-      // 发送短信验证码
+      // 测试模式不调用短信服务，仅模拟发送成功
       this.timeDown();
       this.dialogAtrr.sending = false;
-      smsApi.sendCode(this.userInfo.phone).then(response => {
-        //this.timeDown();
-      }).catch(e => {
-        this.$message.error('发送失败，重新发送')
-        // 发送失败，回到重新获取验证码界面
-        this.showLogin()
-      })
     },
     // 倒计时
     timeDown() {
@@ -262,8 +263,8 @@ export default {
     },
     loginMenu(command) {
       if('/logout' == command) {
-        cookie.set('name', '', {domain: 'localhost'})
-        cookie.set('token', '', {domain: 'localhost'})
+        cookie.set('name', '', { path: '/' })
+        cookie.set('token', '', { path: '/' })
         //跳转页面
         window.location.href = '/'
       } else {
@@ -295,3 +296,8 @@ export default {
   }
 }
 </script>
+<style scoped>
+.help-link {
+  text-decoration: none;
+}
+</style>

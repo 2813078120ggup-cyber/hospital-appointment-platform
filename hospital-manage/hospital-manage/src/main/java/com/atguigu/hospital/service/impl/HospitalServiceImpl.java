@@ -2,6 +2,7 @@ package com.atguigu.hospital.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.atguigu.hospital.mapper.OrderInfoMapper;
+import com.atguigu.hospital.mapper.PatientMapper;
 import com.atguigu.hospital.mapper.ScheduleMapper;
 import com.atguigu.hospital.model.OrderInfo;
 import com.atguigu.hospital.model.Patient;
@@ -10,6 +11,7 @@ import com.atguigu.hospital.service.HospitalService;
 import com.atguigu.hospital.util.ResultCodeEnum;
 import com.atguigu.hospital.util.YyghException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,6 +32,9 @@ public class HospitalServiceImpl implements HospitalService {
 
     @Autowired
     private OrderInfoMapper orderInfoMapper;
+
+    @Autowired
+    private PatientMapper patientMapper;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -171,8 +177,85 @@ public class HospitalServiceImpl implements HospitalService {
      * @param patient
      */
     private Long savePatient(Patient patient) {
-        // 业务：略
-        return 1L;
+        if (patient == null
+                || isBlank(patient.getName())
+                || isBlank(patient.getPhone())) {
+            throw new YyghException(ResultCodeEnum.DATA_ERROR);
+        }
+
+        normalizePatient(patient);
+
+        // 优先使用平台用户 + 证件号识别同一就诊人；没有用户号时兼容旧医院接口，
+        // 使用证件号（或姓名+手机号）作为医院侧的自然键，避免每次下单都新增档案。
+        QueryWrapper<Patient> query = new QueryWrapper<>();
+        if (patient.getUserId() == null) {
+            query.isNull("user_id");
+        } else {
+            query.eq("user_id", patient.getUserId());
+        }
+        if (!isBlank(patient.getCertificatesNo())) {
+            if (isBlank(patient.getCertificatesType())) {
+                query.isNull("certificates_type");
+            } else {
+                query.eq("certificates_type", patient.getCertificatesType());
+            }
+            query.eq("certificates_no", patient.getCertificatesNo());
+        } else {
+            query.eq("name", patient.getName())
+                    .eq("phone", patient.getPhone());
+        }
+        query.orderByAsc("id").last("LIMIT 1");
+
+        List<Patient> patients = patientMapper.selectList(query);
+        if (!patients.isEmpty()) {
+            Patient existing = patients.get(0);
+            // 同一患者再次预约时同步最新联系方式等可变资料，但保留医院患者主键。
+            patient.setId(existing.getId());
+            patient.setCreateTime(existing.getCreateTime());
+            patient.setIsDeleted(existing.getIsDeleted());
+            patientMapper.updateById(patient);
+            return existing.getId();
+        }
+
+        patientMapper.insert(patient);
+        if (patient.getId() == null) {
+            throw new YyghException(ResultCodeEnum.SERVICE_ERROR);
+        }
+        return patient.getId();
+    }
+
+    private void normalizePatient(Patient patient) {
+        patient.setName(trimToNull(patient.getName()));
+        patient.setCertificatesType(trimToNull(patient.getCertificatesType()));
+        patient.setCertificatesNo(trimToNull(patient.getCertificatesNo()));
+        patient.setPhone(trimToNull(patient.getPhone()));
+        patient.setBirthdate(trimToNull(patient.getBirthdate()));
+        patient.setProvinceCode(trimToNull(patient.getProvinceCode()));
+        patient.setCityCode(trimToNull(patient.getCityCode()));
+        patient.setDistrictCode(trimToNull(patient.getDistrictCode()));
+        patient.setAddress(trimToNull(patient.getAddress()));
+        patient.setContactsName(trimToNull(patient.getContactsName()));
+        patient.setContactsCertificatesType(trimToNull(patient.getContactsCertificatesType()));
+        patient.setContactsCertificatesNo(trimToNull(patient.getContactsCertificatesNo()));
+        patient.setContactsPhone(trimToNull(patient.getContactsPhone()));
+        patient.setCardNo(trimToNull(patient.getCardNo()));
+        if (patient.getStatus() == null) {
+            patient.setStatus(0);
+        }
+        if (patient.getIsInsure() == null) {
+            patient.setIsInsure(0);
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private String trimToNull(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        return value.trim();
     }
 
 

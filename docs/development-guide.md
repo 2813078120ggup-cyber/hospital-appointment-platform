@@ -31,9 +31,12 @@ Get-Content java-ai-langchain4j\database\create.sql -Raw | mysql -u root -p
 
 ```powershell
 Get-Content database\migrations\20260825_add_ai_formal_order_support.sql -Raw | mysql -u root -p
+Get-Content database\migrations\20260826_add_doctor.sql -Raw | mysql -u root -p
+Get-Content database\migrations\20260826_add_feedback.sql -Raw | mysql -u root -p
+Get-Content database\migrations\20260827_add_hospital_patient.sql -Raw | mysql -u root -p
 ```
 
-该脚本会先检查字段和索引是否存在，因此可重复执行。它为医院模拟端订单增加跨系统幂等号，并为 AI 预约记录增加平台就诊人、排班和正式订单关联字段。
+迁移脚本均可重复执行。它们为医院模拟端订单增加跨系统幂等号，为 AI 预约记录增加平台就诊人、排班和正式订单关联字段，为医院端医生建立登录账号，为反馈建立数据表，并通过 `20260827_add_hospital_patient.sql` 建立医院侧独立的 `patient` 患者档案表。医院侧患者主键与平台用户服务的患者主键相互独立；医院订单提交时会按平台用户和证件信息复用档案，不再使用固定患者编号。
 
 完整功能需要字典等基础数据。请从可信来源筛选非敏感 INSERT，禁止导入或提交真实用户、证件、手机号、订单和支付数据。字段说明见 [数据库字典](database-dictionary.md)。
 
@@ -44,13 +47,14 @@ Get-Content database\migrations\20260825_add_ai_formal_order_support.sql -Raw | 
 ```powershell
 $env:YYGH_DB_PASSWORD = '<本地 MySQL 密码>'
 $env:YYGH_JWT_SECRET = '<至少 32 个 UTF-8 字节的随机字符串>'
-$env:YYGH_ADMIN_PASSWORD = '<管理端密码>'
+$env:YYGH_ADMIN_PASSWORD = '123456' # 仅限本地演示，生产环境必须改为强密码
 $env:YYGH_HOSPITAL_BOOTSTRAP_TOKEN = '<平台与医院模拟端共享的随机引导令牌>'
+$env:YYGH_NACOS_DISCOVERY_IP = '192.168.6.1'
 ```
 
-基础设施默认连接 `localhost`。如果服务运行在其他主机，继续按 [配置说明](configuration.md) 覆盖 Nacos、Redis、MongoDB、RabbitMQ 和各数据库 URL。第三方能力不用时可保持相应凭据为空，但调用该能力会明确失败。
+后端基础设施默认连接 `192.168.6.101`。如果服务运行在其他主机，继续按 [配置说明](configuration.md) 覆盖 Nacos、Redis、MongoDB、RabbitMQ 和各数据库 URL。第三方能力不用时可保持相应凭据为空，但调用该能力会明确失败。
 
-Windows 若因系统保留端口导致 RabbitMQ 无法绑定 5672，可映射到其他本机端口，并在启动业务服务前设置例如 `$env:YYGH_RABBITMQ_PORT = '25672'`；不要为此删除已有 RabbitMQ 数据卷。
+Windows 存在 VMware、WSL、代理等多块网卡时，所有微服务和网关通过 `YYGH_NACOS_DISCOVERY_IP` 显式指定注册 IP。本项目当前 VMnet8 地址为 `192.168.6.1`；不要让 Nacos 自动选择 `192.168.101.1`，否则虚拟机侧的服务消费者无法回调该实例。更换机器或网段时必须覆盖此变量。
 
 ## 4. 构建后端
 

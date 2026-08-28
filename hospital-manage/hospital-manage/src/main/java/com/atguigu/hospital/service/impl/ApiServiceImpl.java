@@ -102,7 +102,7 @@ public class ApiServiceImpl implements ApiService {
         paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
         paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
 
-        // 功能完善：平台地址由医院设置统一维护，本地默认使用 localhost。
+        // 功能完善：平台地址由医院设置统一维护，默认连接 192.168.6.101。
         //调用平台接口，使用httpclient
         JSONObject respone =
                 HttpRequestHelper.sendRequest(paramMap,
@@ -118,11 +118,18 @@ public class ApiServiceImpl implements ApiService {
 
     @Override
     public Map<String, Object> findDepartment(int pageNum, int pageSize) {
+        return findDepartment(pageNum, pageSize, null);
+    }
+
+    @Override
+    public Map<String, Object> findDepartment(int pageNum, int pageSize, String depcode) {
         Map<String, Object> result = new HashMap();
 
         Map<String, Object> paramMap = new HashMap<>();
         paramMap.put("hoscode", this.getHoscode());
-        //paramMap.put("depcode",depcode);
+        if (depcode != null && !depcode.trim().isEmpty()) {
+            paramMap.put("depcode", depcode.trim());
+        }
         paramMap.put("page", pageNum);
         paramMap.put("limit", pageSize);
         paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
@@ -194,10 +201,31 @@ public class ApiServiceImpl implements ApiService {
 
     @Override
     public Map<String, Object> findSchedule(int pageNum, int pageSize) {
+        return findSchedule(pageNum, pageSize, null, null, null, null, null);
+    }
+
+    @Override
+    public Map<String, Object> findSchedule(int pageNum, int pageSize, String depcode,
+                                            String doctorName, String workDate,
+                                            Integer status, String hosScheduleId) {
         Map<String, Object> result = new HashMap();
         Map<String, Object> paramMap = new HashMap<>();
         paramMap.put("hoscode", this.getHoscode());
-        //paramMap.put("depcode",depcode);
+        if (depcode != null && !depcode.trim().isEmpty()) {
+            paramMap.put("depcode", depcode.trim());
+        }
+        if (doctorName != null && !doctorName.trim().isEmpty()) {
+            paramMap.put("doctorName", doctorName.trim());
+        }
+        if (workDate != null && !workDate.trim().isEmpty()) {
+            paramMap.put("workDate", workDate.trim());
+        }
+        if (status != null) {
+            paramMap.put("status", status);
+        }
+        if (hosScheduleId != null && !hosScheduleId.trim().isEmpty()) {
+            paramMap.put("hosScheduleId", hosScheduleId.trim());
+        }
         paramMap.put("page", pageNum);
         paramMap.put("limit", pageSize);
         paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
@@ -242,7 +270,8 @@ public class ApiServiceImpl implements ApiService {
             schedule.setReservedNumber(jsonObject.getInteger("reservedNumber"));
             schedule.setAvailableNumber(jsonObject.getInteger("availableNumber"));
             schedule.setAmount(jsonObject.getString("amount"));
-            schedule.setStatus(1);
+            Integer status = jsonObject.getInteger("status");
+            schedule.setStatus(status == null ? 1 : status);
 
             Schedule targetSchedule = scheduleMapper.selectById(id);
             if (null != targetSchedule) {
@@ -289,9 +318,70 @@ public class ApiServiceImpl implements ApiService {
         JSONObject respone = HttpRequestHelper.sendRequest(paramMap, this.getApiUrl() + "/api/hosp/schedule/remove");
         System.out.println(respone.toJSONString());
         if (null != respone && 200 == respone.getIntValue("code")) {
+            try {
+                scheduleMapper.deleteById(Long.valueOf(hosScheduleId));
+            } catch (NumberFormatException exception) {
+                log.warn("排班编号不是本地数字主键，仅删除平台排班，hosScheduleId={}", hosScheduleId);
+            }
             return true;
         } else {
             throw new YyghException(respone.getString("message"), 201);
+        }
+    }
+
+    @Override
+    public boolean suspendSchedule(String hosScheduleId, Integer status) {
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("hoscode", this.getHoscode());
+        paramMap.put("hosScheduleId", hosScheduleId);
+        paramMap.put("status", status);
+        paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
+        paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
+        JSONObject respone = HttpRequestHelper.sendRequest(paramMap, this.getApiUrl() + "/api/hosp/schedule/suspend");
+        if (null != respone && 200 == respone.getIntValue("code")) {
+            return true;
+        } else {
+            throw new YyghException(null != respone ? respone.getString("message") : "停诊同步失败", 201);
+        }
+    }
+
+    @Override
+    public Map<String, Object> findFeedback(int pageNum, int pageSize) {
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("hoscode", this.getHoscode());
+        paramMap.put("page", pageNum);
+        paramMap.put("limit", pageSize);
+        paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
+        paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
+        JSONObject respone = HttpRequestHelper.sendRequest(paramMap, this.getApiUrl() + "/api/hosp/feedback/list");
+        if (null != respone && 200 == respone.getIntValue("code")) {
+            JSONObject jsonObject = respone.getJSONObject("data");
+            result.put("total", jsonObject.getLong("totalElements"));
+            result.put("pageNum", pageNum);
+            result.put("list", jsonObject.getJSONArray("content"));
+        } else {
+            throw new YyghException(null != respone ? respone.getString("message") : "反馈列表获取失败", 201);
+        }
+        return result;
+    }
+
+    @Override
+    public boolean handleFeedback(Long id, Integer status, String reply) {
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("hoscode", this.getHoscode());
+        paramMap.put("id", id);
+        paramMap.put("status", status);
+        if (null != reply && !reply.trim().isEmpty()) {
+            paramMap.put("reply", reply.trim());
+        }
+        paramMap.put("timestamp", HttpRequestHelper.getTimestamp());
+        paramMap.put("sign", HttpRequestHelper.getSignSingle(this.getSignKey()));
+        JSONObject respone = HttpRequestHelper.sendRequest(paramMap, this.getApiUrl() + "/api/hosp/feedback/handle");
+        if (null != respone && 200 == respone.getIntValue("code")) {
+            return true;
+        } else {
+            throw new YyghException(null != respone ? respone.getString("message") : "反馈处理失败", 201);
         }
     }
 

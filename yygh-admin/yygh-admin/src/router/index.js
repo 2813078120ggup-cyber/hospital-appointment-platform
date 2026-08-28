@@ -51,8 +51,38 @@ export const constantRoutes = [
       path: 'dashboard',
       name: 'Dashboard',
       component: () => import('@/views/dashboard/index'),
-      meta: { title: 'Dashboard', icon: 'dashboard' }
+      meta: { title: '运营总览', icon: 'dashboard' }
     }]
+  },
+
+  {
+    path: '/order',
+    component: Layout,
+    redirect: '/order/list',
+    name: 'OrderManagement',
+    alwaysShow: true,
+    meta: { title: '订单管理', icon: 'el-icon-s-order' },
+    children: [
+      {
+        path: 'list',
+        name: 'OrderList',
+        component: () => import('@/views/yygh/order/list'),
+        meta: { title: '预约订单', icon: 'table' }
+      },
+      {
+        path: 'show/:id',
+        name: 'OrderShow',
+        component: () => import('@/views/yygh/order/show'),
+        meta: { title: '订单详情', noCache: true },
+        hidden: true
+      },
+      {
+        path: 'compensation',
+        name: 'OrderCompensation',
+        component: () => import('@/views/yygh/order/compensation'),
+        meta: { title: '补偿任务', icon: 'el-icon-refresh' }
+      }
+    ]
   },
 
   {
@@ -117,6 +147,61 @@ export const constantRoutes = [
         name: '数据字典',
         component: () => import('@/views/yygh/dict/list'),
         meta: { title: '数据字典', icon: 'table' }
+      }
+    ]
+  },
+
+  {
+    path: '/content',
+    component: Layout,
+    redirect: '/content/notice/list',
+    name: 'ContentOperations',
+    alwaysShow: true,
+    meta: { title: '内容运营', icon: 'el-icon-document' },
+    children: [
+      {
+        path: 'notice/list',
+        name: 'NoticeList',
+        component: () => import('@/views/yygh/notice/list'),
+        meta: { title: '公告管理', icon: 'el-icon-document-copy' }
+      },
+      {
+        path: 'notice/add',
+        name: 'NoticeAdd',
+        component: () => import('@/views/yygh/notice/form'),
+        meta: { title: '发布公告', icon: 'el-icon-edit-outline' }
+      },
+      {
+        path: 'notice/edit/:id',
+        name: 'NoticeEdit',
+        component: () => import('@/views/yygh/notice/form'),
+        meta: { title: '编辑公告', noCache: true },
+        hidden: true
+      },
+      {
+        path: 'help/list',
+        name: 'HelpArticleList',
+        component: () => import('@/views/yygh/help/list'),
+        meta: { title: '帮助中心', icon: 'el-icon-question' }
+      },
+      {
+        path: 'help/add',
+        name: 'HelpArticleAdd',
+        component: () => import('@/views/yygh/help/form'),
+        meta: { title: '新建帮助文章', icon: 'el-icon-edit-outline' }
+      },
+      {
+        path: 'help/edit/:id',
+        name: 'HelpArticleEdit',
+        component: () => import('@/views/yygh/help/form'),
+        meta: { title: '编辑帮助文章', noCache: true },
+        hidden: true
+      },
+      {
+        path: 'feedback/list',
+        name: 'FeedbackList',
+        component: () => import('@/views/yygh/feedback/list'),
+        meta: { title: '意见反馈', icon: 'el-icon-chat-line-square' }
       }
     ]
   },

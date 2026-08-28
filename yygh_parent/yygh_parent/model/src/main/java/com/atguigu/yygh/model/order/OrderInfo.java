@@ -104,5 +104,29 @@ public class OrderInfo extends BaseEntity {
 	@TableField("order_status")
 	private Integer orderStatus;
 
-}
+	//@ApiModelProperty(value = "取消处理状态（0：未申请 1：处理中 2：成功 3：失败）")
+	@TableField("cancel_status")
+	private Integer cancelStatus;
 
+	//@ApiModelProperty(value = "取消来源（1：用户 2：平台管理员）")
+	@TableField("cancel_source")
+	private Integer cancelSource;
+
+	//@ApiModelProperty(value = "取消原因")
+	@TableField("cancel_reason")
+	private String cancelReason;
+
+	//@ApiModelProperty(value = "取消操作人")
+	@TableField("cancel_operator")
+	private String cancelOperator;
+
+	//@ApiModelProperty(value = "取消完成时间")
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@TableField("cancel_time")
+	private Date cancelTime;
+
+	//@ApiModelProperty(value = "取消处理错误")
+	@TableField("cancel_error")
+	private String cancelError;
+
+}

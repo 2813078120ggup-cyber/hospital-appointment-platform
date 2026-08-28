@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"><body>
+<div th:fragment="navigation(active)" class="doctor-topbar">
+    <span class="doctor-brand"><i class="fa fa-hospital-o"></i> 医生工作台</span>
+    <span class="doctor-identity"><i class="fa fa-user-md"></i> <span th:text="${doctor.docname}">医生</span><span th:if="${doctor.title != null}" th:text="${' · ' + doctor.title}"></span></span>
+    <a th:classappend="${active == 'home' ? ' active' : ''}" href="/doctor/workbench">工作台</a>
+    <a th:classappend="${active == 'schedule' ? ' active' : ''}" href="/doctor/schedule">我的排班</a>
+    <a th:classappend="${active == 'order' ? ' active' : ''}" href="/doctor/order">预约队列</a>
+    <a th:classappend="${active == 'profile' ? ' active' : ''}" href="/doctor/profile">个人资料</a>
+    <a href="/doctor/logout">退出</a>
+</div>
+</body></html>

@@ -14,8 +14,35 @@ public class JwtHelper {
     //token过期时间固定值
     private static long tokenExpiration = 60 * 60 * 1000L;
 
-    // 签名密钥只从运行环境读取，避免把生产凭据提交到版本库。
-    private static final SecretKey tokenSignKey = createTokenSignKey();
+    // 延迟加载的签名密钥：优先使用 Spring 注入的密钥，回退到系统属性/环境变量
+    private static volatile SecretKey tokenSignKey;
+    private static volatile boolean initialized = false;
+
+    /**
+     * Spring Boot 启动时可调用此方法，把 Spring 配置的 yygh.jwt.secret 注入进来。
+     * 这样业务服务无需依赖进程启动时的环境变量，与网关的密钥来源统一。
+     */
+    public static void initSecret(String secret) {
+        if (StringUtils.hasText(secret) && secret.getBytes(StandardCharsets.UTF_8).length >= 32) {
+            tokenSignKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+            initialized = true;
+        }
+    }
+
+    /**
+     * 延迟获取签名密钥：先检查 initSecret 是否注入过，否则从系统属性/环境变量读取。
+     */
+    private static SecretKey getTokenSignKey() {
+        if (!initialized) {
+            synchronized (JwtHelper.class) {
+                if (!initialized) {
+                    tokenSignKey = createTokenSignKey();
+                    initialized = true;
+                }
+            }
+        }
+        return tokenSignKey;
+    }
 
     private static SecretKey createTokenSignKey() {
         String secret = System.getProperty("yygh.jwt.secret");
@@ -39,7 +66,7 @@ public class JwtHelper {
                 .claim("userId", userId)
                 .claim("userName", username).
                 //根据秘钥进行加密
-                        signWith(tokenSignKey).
+                        signWith(getTokenSignKey()).
                 //把生成token压缩
                         compressWith(CompressionCodecs.GZIP).
                 compact();
@@ -49,7 +76,7 @@ public class JwtHelper {
     //根据token字符串，从token获取userid
     public static Long getUserId(String token) {
         if(StringUtils.isEmpty(token)) return null;
-        Jws<Claims> claimsJws = Jwts.parser().setSigningKey(tokenSignKey).parseClaimsJws(token);
+        Jws<Claims> claimsJws = Jwts.parser().setSigningKey(getTokenSignKey()).parseClaimsJws(token);
         Claims claims = claimsJws.getBody();
         Object userId = claims.get("userId");
         return userId instanceof Number ? ((Number) userId).longValue() : null;
@@ -59,7 +86,7 @@ public class JwtHelper {
     public static String getUserName(String token) {
         if(StringUtils.isEmpty(token)) return "";
         Jws<Claims> claimsJws
-                = Jwts.parser().setSigningKey(tokenSignKey).parseClaimsJws(token);
+                = Jwts.parser().setSigningKey(getTokenSignKey()).parseClaimsJws(token);
         Claims claims = claimsJws.getBody();
         return (String)claims.get("userName");
     }

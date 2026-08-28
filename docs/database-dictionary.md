@@ -7,12 +7,12 @@
 | 数据库 | 负责模块 | 表数量 | 源文件校验值（SHA-256 前 12 位） |
 | --- | --- | ---: | --- |
 | `yygh_cmn` | `service-cmn` | 1 | `37534013e6e8` |
-| `yygh_hosp` | `service-hosp` | 1 | `2fc654b33483` |
-| `yygh_manage` | `hospital-manage` | 3 | `e4bc3dae5b5b` |
+| `yygh_hosp` | `service-hosp` | 2 | `2fc654b33483` |
+| `yygh_manage` | `hospital-manage` | 4 | `e4bc3dae5b5b` |
 | `yygh_order` | `service-orders` | 3 | `e3a13668a737` |
 | `yygh_user` | `service-user` | 3 | `738cd69c579f` |
 
-共 5 个数据库、11 张关系表、146 个字段。
+共 5 个数据库、13 张关系表、169 个字段。
 
 ## `yygh_cmn`
 
@@ -61,6 +61,31 @@
 
 - `PRIMARY KEY (`id`)`
 - `UNIQUE KEY `uk_hoscode` (`hoscode`)`
+
+### `feedback` — 意见反馈表
+
+| 字段 | 类型 | 可空 | 默认值 | 扩展 | 说明 |
+| --- | --- | :---: | --- | --- | --- |
+| `id` | `bigint` | 否 | `—` | AUTO_INCREMENT | 编号 |
+| `type` | `tinyint` | 否 | `'1'` | — | 反馈类型（1：平台反馈 2：医院反馈） |
+| `user_id` | `bigint` | 是 | `—` | — | 用户id |
+| `user_name` | `varchar(50)` | 是 | `—` | — | 反馈人姓名/昵称 |
+| `phone` | `varchar(20)` | 是 | `—` | — | 联系电话 |
+| `hoscode` | `varchar(30)` | 是 | `—` | — | 医院编号（医院反馈时填写） |
+| `hosname` | `varchar(100)` | 是 | `—` | — | 医院名称 |
+| `content` | `text` | 否 | `—` | — | 反馈内容 |
+| `status` | `tinyint` | 否 | `'0'` | — | 处理状态（0：待处理 1：已处理） |
+| `reply` | `varchar(500)` | 是 | `—` | — | 处理回复 |
+| `create_time` | `timestamp` | 否 | `CURRENT_TIMESTAMP` | — | 创建时间 |
+| `update_time` | `timestamp` | 否 | `CURRENT_TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | 更新时间 |
+| `is_deleted` | `tinyint` | 否 | `'0'` | — | 逻辑删除(1:已删除，0:未删除) |
+
+索引与约束：
+
+- `PRIMARY KEY (`id`)`
+- `KEY `idx_feedback_type_status` (`type`, `status`)`
+- `KEY `idx_feedback_hoscode` (`hoscode`)`
+- `KEY `idx_feedback_user` (`user_id`)`
 
 ## `yygh_manage`
 
@@ -129,6 +154,27 @@
 索引与约束：
 
 - `PRIMARY KEY (`id`)`
+
+### `doctor` — 医生账号表
+
+| 字段 | 类型 | 可空 | 默认值 | 扩展 | 说明 |
+| --- | --- | :---: | --- | --- | --- |
+| `id` | `bigint` | 否 | `—` | AUTO_INCREMENT | 编号 |
+| `username` | `varchar(30)` | 否 | `—` | — | 登录账号 |
+| `password` | `varchar(64)` | 否 | `—` | — | 登录密码(MD5) |
+| `docname` | `varchar(20)` | 否 | `—` | — | 医生姓名（对应 schedule.docname） |
+| `title` | `varchar(20)` | 是 | `—` | — | 职称 |
+| `phone` | `varchar(20)` | 是 | `—` | — | 联系电话 |
+| `status` | `tinyint` | 否 | `'1'` | — | 状态（1：启用 0：停用） |
+| `create_time` | `timestamp` | 否 | `CURRENT_TIMESTAMP` | — | 创建时间 |
+| `update_time` | `timestamp` | 否 | `CURRENT_TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | 更新时间 |
+| `is_deleted` | `tinyint` | 否 | `'0'` | — | 逻辑删除(1:已删除，0:未删除) |
+
+索引与约束：
+
+- `PRIMARY KEY (`id`)`
+- `UNIQUE KEY `uk_doctor_username` (`username`)`
+- `KEY `idx_doctor_docname` (`docname`)`
 
 ## `yygh_order`
 

@@ -13,10 +13,7 @@
         <span class="v-link clickable dark" onclick="javascript:window.location='/patient'"> 就诊人管理 </span>
       </div>
       <div class="nav-item ">
-        <span class="v-link clickable dark"> 修改账号信息 </span>
-      </div>
-      <div class="nav-item ">
-        <span class="v-link clickable dark"> 意见反馈 </span>
+        <span class="v-link clickable dark" onclick="javascript:window.location='/user/feedback'"> 意见反馈 </span>
       </div>
     </div>
     <!-- 左侧导航 #end -->
@@ -106,6 +103,7 @@ import '~/assets/css/hospital.css'
 import '~/assets/css/personal.css'
 import dictApi from '@/api/dict'
 import userInfoApi from '@/api/userInfo'
+import { isMockLogin, mockUserInfo } from '@/utils/mockAccount'
 const defaultForm = {
   name: '',
   certificatesType: '',
@@ -116,6 +114,7 @@ export default {
   data() {
     return {
       userAuah: defaultForm,
+      formData: {},
       certificatesTypeList: [],
       fileUrl:'http://localhost:8222/admin/oss/file/upload',
       userInfo: {
@@ -133,6 +132,10 @@ export default {
       this.getDict()
     },
     getUserInfo() {
+      if (isMockLogin()) {
+        this.userInfo = mockUserInfo
+        return
+      }
       userInfoApi.getUserInfo().then(response => {
         this.userInfo = response.data.userInfo
       })

@@ -82,14 +82,7 @@
       </div>
       </div>
       <div class="content-wrapper">
-      <span class="item v-link clickable dark">神经内科 </span>
-      <span class="item v-link clickable dark">消化内科 </span>
-      <span class="item v-link clickable dark">呼吸内科 </span>
-      <span class="item v-link clickable dark">内科 </span>
-      <span class="item v-link clickable dark">神经外科 </span>
-      <span class="item v-link clickable dark">妇科 </span>
-      <span class="item v-link clickable dark"> 产科 </span>
-      <span class="item v-link clickable dark">儿科 </span>
+      <span class="item v-link clickable dark" v-for="department in commonDepartments" :key="department" @click="selectCommonDepartment(department)">{{ department }}</span>
       </div>
     </div>
     <div class="space">
@@ -100,24 +93,17 @@
       </div>
       <span class="title">平台公告</span>
       </div>
-      <div class="all-wrapper">
+      <div class="all-wrapper" @click="showNoticeList('平台公告')">
       <span>全部</span>
       <span class="iconfont icon"></span>
       </div>
       </div>
       <div class="content-wrapper">
-      <div class="notice-wrapper">
-      <div class="point"></div>
-      <span class="notice v-link clickable dark">关于延长北京大学国际医院放假的通知 </span>
+      <div v-for="notice in platformNotices.slice(0, 3)" :key="notice.id" class="notice-wrapper">
+        <div class="point"></div>
+        <span class="notice v-link clickable dark" @click="showNotice(notice, '平台公告')">{{ notice.title }}</span>
       </div>
-      <div class="notice-wrapper">
-      <div class="point"></div>
-      <span class="notice v-link clickable dark">北京中医药大学东方医院部分科室医生门诊医 </span>
-      </div>
-      <div class="notice-wrapper">
-      <div class="point"></div>
-      <span class="notice v-link clickable dark"> 武警总医院号源暂停更新通知 </span>
-      </div>
+      <div v-if="platformNotices.length === 0" class="notice-empty">暂无平台公告</div>
       </div>
     </div>
     <div class="suspend-notice-list space">
@@ -128,42 +114,63 @@
       </div>
       <span class="title">停诊公告</span>
       </div>
-      <div class="all-wrapper">
+      <div class="all-wrapper" @click="showNoticeList('停诊公告')">
       <span>全部</span>
       <span class="iconfont icon"></span>
       </div>
       </div>
       <div class="content-wrapper">
-      <div class="notice-wrapper">
-      <div class="point"></div>
-      <span class="notice v-link clickable dark"> 中国人民解放军总医院第六医学中心(原海军总医院)呼吸内科门诊停诊公告 </span>
-      </div>
-      <div class="notice-wrapper">
-      <div class="point"></div>
-    <span class="notice v-link clickable dark"> 首都医科大学附属北京潞河医院老年医学科门诊停诊公告 </span>
-    </div>
-      <div class="notice-wrapper">
+      <div v-for="notice in suspendNotices.slice(0, 3)" :key="notice.id" class="notice-wrapper">
         <div class="point"></div>
-        <span class="notice v-link clickable dark">中日友好医院中西医结合心内科门诊停诊公告 </span>
+        <span class="notice v-link clickable dark" @click="showNotice(notice, '停诊公告')">{{ notice.title }}</span>
       </div>
+      <div v-if="suspendNotices.length === 0" class="notice-empty">暂无停诊公告</div>
     </div>
     </div>
     </div>
     </div>
+    <el-dialog :title="selectedNotice.type" :visible.sync="noticeDialogVisible" width="520px">
+    <div v-if="selectedNotice.title" class="notice-dialog-content">
+      <div class="notice-dialog-title">{{ selectedNotice.title }}</div>
+      <p>{{ selectedNotice.content }}</p>
+      <div v-if="selectedNotice.publishTime" class="notice-dialog-time">发布时间：{{ selectedNotice.publishTime }}</div>
+    </div>
+    </el-dialog>
+    <el-dialog :title="noticeListType" :visible.sync="noticeListDialogVisible" width="560px">
+      <div v-if="selectedNoticeList.length" class="notice-dialog-list">
+        <button
+          v-for="notice in selectedNoticeList"
+          :key="notice.id"
+          type="button"
+          class="notice-list-item"
+          @click="openNoticeFromList(notice)"
+        >
+          <span>{{ notice.title }}</span>
+          <small>{{ notice.publishTime || '' }}</small>
+        </button>
+      </div>
+      <div v-else class="notice-empty">暂无公告</div>
+    </el-dialog>
   </div>
 </template>
 <script>
 import hospApi from '@/api/hospital.js'
 import dictApi from '@/api/dict.js'
+import noticeApi from '@/api/notice.js'
 export default {
   //服务端渲染异步，显示医院列表
   asyncData({ params, error }) {
     //调用
-    return hospApi.getPageList(1,10,null)
-      .then(response => {
+    return Promise.all([
+      hospApi.getPageList(1,10,null),
+      noticeApi.getPublishedList(1).catch(() => null),
+      noticeApi.getPublishedList(2).catch(() => null)
+    ]).then(([hospitalResponse, platformResponse, suspendResponse]) => {
         return {
-          list: response.data.pages.content,
-          pages: response.data.pages.totalPages
+          list: hospitalResponse.data.pages.content,
+          pages: hospitalResponse.data.pages.totalPages,
+          platformNotices: platformResponse ? platformResponse.data.list || [] : [],
+          suspendNotices: suspendResponse ? suspendResponse.data.list || [] : []
         }
       })
   },
@@ -173,10 +180,23 @@ export default {
       page: 1,
       limit: 10,
       hosname: '', //医院名称
-      hostypeList: [], //医院等级集合
-      districtList: [], //地区集合
+      hostypeList: [{ id: 'all-hostype', name: '全部', value: '' }], //医院等级集合
+      districtList: [{ id: 'all-district', name: '全部', value: '' }], //地区集合
       hostypeActiveIndex: 0,
       provinceActiveIndex: 0
+      ,commonDepartments: ['神经内科', '消化内科', '呼吸内科', '内科', '神经外科', '妇科', '产科', '儿科']
+      ,platformNotices: []
+      ,suspendNotices: []
+      ,noticeDialogVisible: false
+      ,noticeListDialogVisible: false
+      ,noticeListType: ''
+      ,selectedNoticeList: []
+      ,selectedNotice: {
+        type: '',
+        title: '',
+        content: '',
+        publishTime: ''
+      }
     }
   },
   created() {
@@ -191,19 +211,21 @@ export default {
           //hostypeList清空
           this.hostypeList = []
           //向hostypeList添加全部值
-          this.hostypeList.push({"name":"全部","value":""})
+          this.hostypeList.push({ id: 'all-hostype', name: '全部', value: '' })
           //把接口返回数据，添加到hostypeList
-          for(var i=0;i<response.data.list.length;i++) {
-              this.hostypeList.push(response.data.list[i])
+          const list = response.data.list || []
+          for(var i=0;i<list.length;i++) {
+              this.hostypeList.push(list[i])
           }
       })
       //查询地区数据
-      dictApi.findByDictCode('Beijing')
+      dictApi.findByDictCode('Beijin')
         .then(response => {
           this.districtList = []
-          this.districtList.push({"name":"全部","value":""})
-          for(let i in response.data.list) {
-            this.districtList.push(response.data.list[i])
+          this.districtList.push({ id: 'all-district', name: '全部', value: '' })
+          const list = response.data.list || []
+          for(let i in list) {
+            this.districtList.push(list[i])
           }
         })
     },
@@ -253,7 +275,80 @@ export default {
     //点击某个医院名称，跳转到详情页面中
     show(hoscode) {
       window.location.href = '/hospital/' + hoscode
+    },
+    selectCommonDepartment(department) {
+      this.$message.info('请先选择医院，再进入' + department + '预约挂号')
+    },
+    showNotice(notice, type) {
+      this.selectedNotice = {
+        type: type,
+        title: notice.title,
+        content: notice.content || notice.summary || '',
+        publishTime: notice.publishTime || ''
+      }
+      this.noticeDialogVisible = true
+    },
+    showNoticeList(type) {
+      this.noticeListType = type
+      this.selectedNoticeList = type === '停诊公告' ? this.suspendNotices : this.platformNotices
+      this.noticeListDialogVisible = true
+    },
+    openNoticeFromList(notice) {
+      this.noticeListDialogVisible = false
+      this.showNotice(notice, this.noticeListType)
     }
   }
 }
 </script>
+
+<style scoped>
+.notice-empty {
+  padding: 8px 0;
+  color: #999;
+  font-size: 13px;
+}
+
+.notice-dialog-content p {
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.notice-dialog-title {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.notice-dialog-time {
+  margin-top: 20px;
+  color: #999;
+  font-size: 12px;
+  text-align: right;
+}
+
+.notice-list-item {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 0;
+  color: #333;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.notice-list-item:hover,
+.notice-list-item:focus {
+  color: #4490f1;
+}
+
+.notice-list-item small {
+  margin-left: 16px;
+  color: #999;
+  white-space: nowrap;
+}
+</style>

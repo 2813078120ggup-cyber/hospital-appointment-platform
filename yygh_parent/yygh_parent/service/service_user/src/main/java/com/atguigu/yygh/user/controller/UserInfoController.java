@@ -7,6 +7,7 @@ import com.atguigu.yygh.model.user.UserInfo;
 import com.atguigu.yygh.user.service.UserInfoService;
 import com.atguigu.yygh.vo.user.LoginVo;
 import com.atguigu.yygh.vo.user.UserAuthVo;
+import com.atguigu.yygh.vo.user.UserInfoUpdateVo;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -47,6 +48,14 @@ public class UserInfoController {
         Long userId = AuthContextHolder.getUserId(request);
         UserInfo userInfo = userInfoService.getById(userId);
         return R.ok().data("userInfo", userInfo);
+    }
+
+    //修改账号信息
+    @PostMapping("auth/updateUserInfo")
+    public R updateUserInfo(@RequestBody UserInfoUpdateVo updateVo, HttpServletRequest request) {
+        Long userId = AuthContextHolder.getUserId(request);
+        userInfoService.updateUserInfo(userId, updateVo);
+        return R.ok();
     }
 
     //登录接口-手机验证码登录

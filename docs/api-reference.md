@@ -101,6 +101,7 @@ Controller：`ApiController`  ·  端口：`8201`  ·  源码：`yygh_parent/yyg
 | `POST` | `/api/hosp/selectSchedule` | 查询是否有号源 | 公开 | Form：科室、日期、时间、可选医生 | `Result<Boolean>` |
 | `POST` | `/api/hosp/auth/selectSchedule` | 解析正式下单排班 | 登录用户 | Form：科室、日期、时间、可选医生 | `R` |
 | `POST` | `/api/hosp/schedule/remove` | 删除排班 | 公开/按业务校验 | — | `Result` |
+| `POST` | `/api/hosp/schedule/suspend` | 同步排班停诊/恢复状态 | 公开/按业务校验 | Form：hoscode、hosScheduleId、status（-1停诊 0停约 1恢复） | `Result` |
 | `POST` | `/api/hosp/schedule/list` | 获取排班分页列表 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/saveSchedule` | 上传排班 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/department/remove` | 删除科室 | 公开/按业务校验 | — | `Result` |
@@ -108,6 +109,9 @@ Controller：`ApiController`  ·  端口：`8201`  ·  源码：`yygh_parent/yyg
 | `POST` | `/api/hosp/saveDepartment` | 上传科室 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/hospital/show` | 获取医院信息 | 公开/按业务校验 | — | `Result` |
 | `POST` | `/api/hosp/saveHospital` | 上传医院 | 公开/按业务校验 | — | `Result` |
+| `POST` | `/api/hosp/feedback/auth/save` | 患者提交意见反馈 | 登录用户 | JSON：type（1平台 2医院）、hoscode、hosname、content、phone | `R` |
+| `POST` | `/api/hosp/feedback/list` | 医院端拉取本医院反馈 | 公开/按业务校验 | Form：hoscode、page、limit | `Result` |
+| `POST` | `/api/hosp/feedback/handle` | 医院端处理反馈 | 公开/按业务校验 | Form：hoscode、id、status、reply | `Result` |
 
 ## `service-hosp` / 科室数据接口
 
@@ -178,6 +182,16 @@ Controller：`ScheduleController`  ·  端口：`8201`  ·  源码：`yygh_paren
 | `GET` | `/admin/hosp/schedule/getScheduleRule/{page}/{limit}/{hoscode}/{depcode}` | 查询排班规则数据 | 管理端 | PathVariable  long page; PathVariable  long limit; PathVariable  String hoscode; PathVariable  String depcode | `R` |
 | `GET` | `/admin/hosp/schedule/getScheduleDetail/{hoscode}/{depcode}/{workDate}` | 查询排班详细信息 | 管理端 | PathVariable  String hoscode; PathVariable  String depcode; PathVariable  String workDate | `R` |
 
+## `service-hosp` / 意见反馈接口
+
+Controller：`AdminFeedbackController` / `FeedbackApiController`  ·  端口：`8201`  ·  源码：`yygh_parent/yygh_parent/service/service_hosp/src/main/java/com/atguigu/yygh/hosp/controller/`
+
+| 方法 | 路径 | 用途 | 访问范围 | 参数摘要 | 返回类型 |
+| --- | --- | --- | --- | --- | --- |
+| `GET` | `/admin/hosp/feedback/{page}/{limit}` | 管理端意见反馈分页 | 管理端 | PathVariable  Long page; PathVariable  Long limit; 可选 type/status/keyword | `R` |
+| `GET` | `/admin/hosp/feedback/show/{id}` | 反馈详情 | 管理端 | PathVariable  Long id | `R` |
+| `PUT` | `/admin/hosp/feedback/handle/{id}` | 管理端处理反馈 | 管理端 | PathVariable  Long id; JSON status/reply | `R` |
+
 ## `service-msm` / MsmController
 
 Controller：`MsmController`  ·  端口：`8204`  ·  源码：`yygh_parent/yygh_parent/service/service_msm/src/main/java/com/atguigu/yygh/msm/controller/MsmController.java`
@@ -206,6 +220,18 @@ Controller：`WeixinController`  ·  端口：`8207`  ·  源码：`yygh_parent/
 | --- | --- | --- | --- | --- | --- |
 | `GET` | `/api/order/weixin/createNative/{orderId}` | createNative | 公开/按业务校验 | PathVariable  Long orderId | `R` |
 | `GET` | `/api/order/weixin/queryPayStatus/{orderId}` | 查询支付状态 | 公开/按业务校验 | PathVariable  Long orderId | `R` |
+
+## `service-orders` / 订单运营与补偿
+
+Controller：`AdminOrderInfoController`、`AdminCompensationController`  ·  端口：`8207`  ·  访问范围：平台管理员
+
+| 方法 | 路径 | 用途 | 参数摘要 | 返回类型 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/admin/order/orderInfo/{page}/{limit}` | 订单分页查询 | 可选订单/患者/医院/取消状态筛选 | `R` |
+| `GET` | `/admin/order/orderInfo/show/{orderId}` | 订单、支付、退款详情 | PathVariable  Long orderId | `R` |
+| `POST` | `/admin/order/orderInfo/cancel/{orderId}` | 管理员取消订单 | JSON：reason | `R` |
+| `GET` | `/admin/order/compensation/{page}/{limit}` | 补偿 outbox/死信查询 | 可选 status、taskType | `R` |
+| `POST` | `/admin/order/compensation/retry/{taskId}` | 重新投递死信任务 | PathVariable  Long taskId | `R` |
 
 ## `service-oss` / 阿里云文件管理
 
@@ -254,6 +280,7 @@ Controller：`UserInfoController`  ·  端口：`8160`  ·  源码：`yygh_paren
 | --- | --- | --- | --- | --- | --- |
 | `POST` | `/api/user/auth/userAuth` | userAuth | 登录用户 | RequestBody  UserAuthVo userAuthVo | `R` |
 | `GET` | `/api/user/auth/getUserInfo` | getUserInfo | 登录用户 | — | `R` |
+| `POST` | `/api/user/auth/updateUserInfo` | 修改账号信息 | 登录用户 | RequestBody  UserInfoUpdateVo（name/nickName） | `R` |
 | `POST` | `/api/user/login` | 会员登录 | 公开/按业务校验 | RequestBody  LoginVo loginVo | `R` |
 
 ## `service-user` / WeixinApiController

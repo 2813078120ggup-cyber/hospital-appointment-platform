@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { MessageBox, Message } from 'element-ui'
+import { Message } from 'element-ui'
 import store from '@/store'
 import { getToken } from '@/utils/auth'
 
@@ -42,6 +42,9 @@ service.interceptors.response.use(
    * You can also judge the status by HTTP Status Code
    */
   response => {
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     const res = response.data
 
     // if the custom code is not 20000, it is judged as an error.
@@ -52,17 +55,15 @@ service.interceptors.response.use(
         duration: 5 * 1000
       })
 
-      // 50008: Illegal token; 50012: Other clients logged in; 50014: Token expired;
+      // 功能完善：登录过期时提示“登录过期”并自动退出账号，重置登录态后回到登录页。
       if (res.code === 50008 || res.code === 50012 || res.code === 50014) {
-        // to re-login
-        MessageBox.confirm('You have been logged out, you can cancel to stay on this page, or log in again', 'Confirm logout', {
-          confirmButtonText: 'Re-Login',
-          cancelButtonText: 'Cancel',
-          type: 'warning'
-        }).then(() => {
-          store.dispatch('user/resetToken').then(() => {
-            location.reload()
-          })
+        Message({
+          message: '登录过期',
+          type: 'error',
+          duration: 3 * 1000
+        })
+        store.dispatch('user/resetToken').then(() => {
+          location.reload()
         })
       }
       return Promise.reject(new Error(res.message || 'Error'))
@@ -72,6 +73,19 @@ service.interceptors.response.use(
   },
   error => {
     console.log('err' + error) // for debug
+    // 网关认证失败返回 401 + code 50008，同样按登录过期退出账号。
+    const errData = error.response && error.response.data
+    if (errData && (errData.code === 50008 || errData.code === 50012 || errData.code === 50014)) {
+      Message({
+        message: '登录过期',
+        type: 'error',
+        duration: 3 * 1000
+      })
+      store.dispatch('user/resetToken').then(() => {
+        location.reload()
+      })
+      return Promise.reject(new Error(errData.message || '登录过期'))
+    }
     Message({
       message: error.message,
       type: 'error',

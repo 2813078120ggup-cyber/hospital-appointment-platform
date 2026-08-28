@@ -6,5 +6,12 @@ export default {
         url: `/admin/cmn/dict/findDataById/${id}`,
         method: 'get'
       })
+    },
+    exportData() {
+      return request({
+        url: '/admin/cmn/dict/exportData',
+        method: 'get',
+        responseType: 'blob'
+      })
     }
 }

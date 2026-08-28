@@ -1,11 +1,11 @@
 <template>
-<div class="app-container">
+<div v-loading="loading" class="app-container">
     <h4>基本信息</h4>
     <table class="table table-striped table-condenseda table-bordered" width="100%">
         <tbody>
             <tr>
                 <th width="15%">医院名称</th>
-                <td width="35%"><b style="font-size: 14px">{{ hospital.hosname }}</b> | {{ hospital.param.hostypeString }}</td>
+                <td width="35%"><b style="font-size: 14px">{{ hospital.hosname }}</b> | {{ hospitalParam.hostypeString }}</td>
                 <th width="15%">医院logo</th>
                 <td width="35%">
                     <img :src="'data:image/jpeg;base64,'+hospital.logoData" width="80">
@@ -15,7 +15,7 @@
                 <th>医院编码</th>
                 <td>{{ hospital.hoscode }}</td>
                 <th>地址</th>
-                <td>{{ hospital.param.fullAddress }}</td>
+                <td>{{ hospitalParam.fullAddress }}</td>
             </tr>
             <tr>
                 <th>坐车路线</th>
@@ -46,7 +46,7 @@
                 <th>预约规则</th>
                 <td colspan="3">
                 <ol>
-                <li v-for="item in bookingRule.rule" :key="item">{{ item }}</li>
+                <li v-for="item in bookingRules" :key="item">{{ item }}</li>
                 </ol>
                 </td>
             </tr>
@@ -63,8 +63,17 @@ import hospApi from '@/api/yygh/hosp'
 export default {
     data() {
         return {
-            hospital: null,  //医院信息
-            bookingRule: null //预约信息
+            loading: true,
+            hospital: {},  //医院信息
+            bookingRule: {} //预约信息
+        }
+    },
+    computed: {
+        hospitalParam() {
+            return this.hospital.param || {}
+        },
+        bookingRules() {
+            return this.bookingRule.rule || []
         }
     },
     created() {
@@ -80,6 +89,8 @@ export default {
                 .then(response => {
                     this.hospital = response.data.hospital
                     this.bookingRule = response.data.bookingRule
+                }).finally(() => {
+                    this.loading = false
                 })
         },
         //返回医院列表

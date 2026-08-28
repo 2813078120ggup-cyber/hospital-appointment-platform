@@ -35,6 +35,37 @@ CREATE TABLE `order_info` (
   UNIQUE KEY `uk_platform_order_no` (`platform_order_no`)
 ) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb3 COMMENT='订单表';
 
+DROP TABLE IF EXISTS `patient`;
+CREATE TABLE `patient` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `user_id` bigint DEFAULT NULL COMMENT '平台用户id',
+  `name` varchar(20) NOT NULL COMMENT '姓名',
+  `certificates_type` varchar(3) DEFAULT NULL COMMENT '证件类型',
+  `certificates_no` varchar(30) DEFAULT NULL COMMENT '证件编号',
+  `sex` tinyint DEFAULT NULL COMMENT '性别',
+  `birthdate` date DEFAULT NULL COMMENT '出生年月',
+  `phone` varchar(11) NOT NULL COMMENT '手机',
+  `is_marry` tinyint DEFAULT NULL COMMENT '是否结婚',
+  `province_code` varchar(20) DEFAULT NULL COMMENT '省code',
+  `city_code` varchar(20) DEFAULT NULL COMMENT '市code',
+  `district_code` varchar(20) DEFAULT NULL COMMENT '区code',
+  `address` varchar(100) DEFAULT NULL COMMENT '详情地址',
+  `contacts_name` varchar(20) DEFAULT NULL COMMENT '联系人姓名',
+  `contacts_certificates_type` varchar(3) DEFAULT NULL COMMENT '联系人证件类型',
+  `contacts_certificates_no` varchar(30) DEFAULT NULL COMMENT '联系人证件号',
+  `contacts_phone` varchar(11) DEFAULT NULL COMMENT '联系人手机',
+  `card_no` varchar(50) DEFAULT NULL COMMENT '就诊卡号',
+  `is_insure` tinyint NOT NULL DEFAULT '0' COMMENT '是否有医保',
+  `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态（0：默认 1：已认证）',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `is_deleted` tinyint NOT NULL DEFAULT '0' COMMENT '逻辑删除(1:已删除，0:未删除)',
+  PRIMARY KEY (`id`),
+  KEY `idx_patient_user_id` (`user_id`),
+  KEY `idx_patient_certificates` (`certificates_type`,`certificates_no`),
+  KEY `idx_patient_phone_name` (`phone`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='医院侧就诊人档案';
+
 DROP TABLE IF EXISTS `schedule`;
 CREATE TABLE `schedule` (
   `id` bigint NOT NULL DEFAULT '0' COMMENT '编号',
@@ -54,3 +85,20 @@ CREATE TABLE `schedule` (
   `is_deleted` tinyint NOT NULL DEFAULT '0' COMMENT '逻辑删除(1:已删除，0:未删除)',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COMMENT='医生日程安排表';
+
+DROP TABLE IF EXISTS `doctor`;
+CREATE TABLE `doctor` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `username` varchar(30) NOT NULL COMMENT '登录账号',
+  `password` varchar(64) NOT NULL COMMENT '登录密码(MD5)',
+  `docname` varchar(20) NOT NULL COMMENT '医生姓名（对应 schedule.docname）',
+  `title` varchar(20) DEFAULT NULL COMMENT '职称',
+  `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '状态（1：启用 0：停用）',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `is_deleted` tinyint NOT NULL DEFAULT '0' COMMENT '逻辑删除(1:已删除，0:未删除)',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_doctor_username` (`username`),
+  KEY `idx_doctor_docname` (`docname`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='医生账号表';

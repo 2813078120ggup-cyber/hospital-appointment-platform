@@ -21,7 +21,7 @@ export default {
     //添加医院设置
     addHospSet(hospitalSet) {
         return request({
-            url: `${api_name}/addHospSet`,
+            url: `${api_name}/saveHospSet`,
             method: 'post',
             data: hospitalSet //用json方式传递
         })
